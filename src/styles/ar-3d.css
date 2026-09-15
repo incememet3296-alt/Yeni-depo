@@ -1,0 +1,32 @@
+.camera-3d-ar-button {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 30;
+  border: 1px solid rgba(255,255,255,.28);
+  border-radius: 999px;
+  padding: 13px 20px;
+  min-height: 48px;
+  background: rgba(15,23,42,.88);
+  color: #fff;
+  font: 600 15px/1 system-ui, sans-serif;
+  box-shadow: 0 8px 28px rgba(0,0,0,.35);
+  backdrop-filter: blur(10px);
+}
+
+.camera-3d-ar-button:disabled { opacity: .65; }
+.camera-3d-ar-button:active { transform: translateX(-50%) scale(.97); }
+
+.camera-3d-ar-active {
+  position: absolute;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(16,185,129,.88);
+  color: #fff;
+  font: 600 13px/1 system-ui, sans-serif;
+}
