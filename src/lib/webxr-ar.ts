@@ -51,7 +51,7 @@ function invertMatrix(matrix: Float32Array): Float32Array | null {
   const b05 = m02 * m13 - m03 * m12
   const b06 = m20 * m31 - m21 * m30
   const b07 = m20 * m32 - m22 * m30
-  const b08 = m20 * m33 - m22 * m30
+  const b08 = m20 * m33 - m23 * m30
   const b09 = m21 * m32 - m22 * m31
   const b10 = m21 * m33 - m23 * m31
   const b11 = m22 * m33 - m23 * m32
@@ -137,12 +137,16 @@ async function requestCompatibleSession(xr: NonNullable<XRNavigator['xr']>): Pro
 export async function startWebXRAnimalSession(
   animals: Animal[],
   location: UserLocation,
-  heading: number,
+  headingOrOnEnd?: number | (() => void),
   onEnd?: () => void,
 ): Promise<XRSessionLike | null> {
   const xr = (typeof navigator !== 'undefined' ? navigator : null) as XRNavigator | null
   if (!xr?.xr) return null
 
+  const heading = typeof headingOrOnEnd === 'number'
+    ? headingOrOnEnd
+    : location.heading ?? 0
+  const endHandler = typeof headingOrOnEnd === 'function' ? headingOrOnEnd : onEnd
   const session = await requestCompatibleSession(xr.xr)
   if (!session) return null
 
@@ -185,7 +189,7 @@ export async function startWebXRAnimalSession(
       0, 0.15, 0.2, -0.35, -0.2, 0.2, 0.35, -0.2, 0.2,
     ]), gl.STATIC_DRAW)
 
-    session.addEventListener('end', () => onEnd?.())
+    session.addEventListener('end', () => endHandler?.())
     const render = (_time: number, frame: XRFrameLike) => {
       const pose = frame.getViewerPose(referenceSpace)
       if (!pose || !layer.framebuffer) {
