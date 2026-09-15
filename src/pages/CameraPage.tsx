@@ -12,7 +12,7 @@ import { useCamera } from '../hooks/useCamera'
 import { useLocation } from '../hooks/useLocation'
 import { useOrientation } from '../hooks/useOrientation'
 import { useArSupport } from '../hooks/useArSupport'
-import { getHeading } from '../lib/compass'
+import { getHeading, normalizeHeading } from '../lib/compass'
 import { calculateAnimalPosition } from '../lib/animal-position'
 import { calculateDistance } from '../lib/distance'
 import { startWebXRAnimalSession } from '../lib/webxr-ar'
@@ -22,11 +22,18 @@ import '../styles/ar-3d.css'
 
 const FIELD_OF_VIEW = 60
 const VERTICAL_FIELD_OF_VIEW = 45
+const HEADING_SMOOTHING = 0.18
 
 type WebXRSession = Awaited<ReturnType<typeof startWebXRAnimalSession>>
 
 interface CameraPageProps {
   onNavigate: (path: string) => void
+}
+
+function smoothCircularHeading(previous: number | null, current: number): number {
+  if (previous == null) return normalizeHeading(current)
+  const delta = ((current - previous + 540) % 360) - 180
+  return normalizeHeading(previous + delta * HEADING_SMOOTHING)
 }
 
 export function CameraPage({ onNavigate }: CameraPageProps) {
@@ -42,6 +49,7 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
   const [xrUnavailable, setXrUnavailable] = useState(false)
   const xrSessionRef = useRef<WebXRSession>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const headingRef = useRef<number | null>(null)
 
   useEffect(() => {
     const onResize = () => setViewport({ width: window.innerWidth, height: window.innerHeight })
@@ -60,9 +68,16 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
     }
   }, [])
 
-  const heading = useMemo(() => {
+  const rawHeading = useMemo(() => {
     return getHeading(orientation.data, location.data?.heading)
   }, [orientation.data, location.data?.heading])
+
+  const heading = useMemo(() => {
+    if (rawHeading == null) return null
+    const next = smoothCircularHeading(headingRef.current, rawHeading)
+    headingRef.current = next
+    return next
+  }, [rawHeading])
 
   const animalPositions = useMemo(() => {
     const currentLocation = location.data
