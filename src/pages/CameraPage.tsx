@@ -167,7 +167,7 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
                 />
               ))}
             </div>
-            {arSupport.webxrImmersiveAr && !xrActive && (
+            {arSupport.hasImmersiveAr && !xrActive && (
               <button className="camera-3d-ar-button" onClick={() => void start3DAr()} disabled={xrStarting || !location.data}>
                 {xrStarting ? '3D AR başlatılıyor…' : '🥽 Gerçek 3D AR'}
               </button>
