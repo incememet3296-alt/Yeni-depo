@@ -38,7 +38,7 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
   const [fallbackMode, setFallbackMode] = useState(false)
   const [xrStarting, setXrStarting] = useState(false)
   const [xrActive, setXrActive] = useState(false)
-  const [xrError, setXrError] = useState<string | null>(null)
+  const [xrUnavailable, setXrUnavailable] = useState(false)
   const xrSessionRef = useRef<WebXRSession>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -68,10 +68,10 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
     return ANIMALS.map((animal) => ({
       animal,
       position: calculateAnimalPosition(animal, {
-        latitude: location.data!.latitude,
-        longitude: location.data!.longitude,
-        accuracy: location.data!.accuracy,
-        altitude: location.data!.altitude,
+        latitude: location.data.latitude,
+        longitude: location.data.longitude,
+        accuracy: location.data.accuracy,
+        altitude: location.data.altitude,
         heading,
       }, heading),
     }))
@@ -80,20 +80,23 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
   const start3DAr = async () => {
     if (!location.data || xrStarting || xrActive) return
     setXrStarting(true)
-    setXrError(null)
+    setXrUnavailable(false)
     try {
       const session = await startWebXRAnimalSession(ANIMALS, location.data, () => {
         xrSessionRef.current = null
         setXrActive(false)
       })
       if (!session) {
-        setXrError('Bu cihaz veya tarayıcı gerçek WebXR AR modunu başlatamadı. Kamera + sensör modu kullanılabilir.')
+        // WebXR can be reported as supported while the browser still rejects
+        // immersive-ar at runtime. Keep the camera/sensor 3D mode active.
+        setXrUnavailable(true)
         return
       }
       xrSessionRef.current = session
       setXrActive(true)
     } catch {
-      setXrError('3D AR başlatılamadı. Kamera + sensör modu ile devam edebilirsin.')
+      // Never block discovery when native WebXR is unavailable.
+      setXrUnavailable(true)
     } finally {
       setXrStarting(false)
     }
@@ -146,13 +149,13 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
                 <AnimalMarker key={ap.animal.id} animal={ap.animal} position={ap.position} screenWidth={viewport.width} screenHeight={viewport.height} fieldOfView={FIELD_OF_VIEW} verticalFieldOfView={VERTICAL_FIELD_OF_VIEW} onSelect={() => setSelected(ap.animal)} />
               ))}
             </div>
-            {arSupport.hasImmersiveAr && !xrActive && (
+            {arSupport.hasImmersiveAr && !xrActive && !xrUnavailable && (
               <button className="camera-3d-ar-button" onClick={() => void start3DAr()} disabled={xrStarting || !location.data}>
                 {xrStarting ? '3D AR başlatılıyor…' : '🥽 Gerçek 3D AR'}
               </button>
             )}
             {xrActive && <div className="camera-3d-ar-active" role="status">🥽 3D AR aktif</div>}
-            {xrError && <StatusMessage type="warning" title="3D AR kullanılamadı" message={xrError} />}
+            {xrUnavailable && <div className="camera-3d-ar-active" role="status">📱 Kamera + sensör 3D modu aktif</div>}
           </>
         ) : (
           <CameraPermission onRequest={camera.start} />
