@@ -36,6 +36,47 @@ function matrixMultiply(a: Float32Array, b: Float32Array): Float32Array {
   return out
 }
 
+function invertMatrix(matrix: Float32Array): Float32Array | null {
+  const out = new Float32Array(16)
+  const m00 = matrix[0], m01 = matrix[1], m02 = matrix[2], m03 = matrix[3]
+  const m10 = matrix[4], m11 = matrix[5], m12 = matrix[6], m13 = matrix[7]
+  const m20 = matrix[8], m21 = matrix[9], m22 = matrix[10], m23 = matrix[11]
+  const m30 = matrix[12], m31 = matrix[13], m32 = matrix[14], m33 = matrix[15]
+  const b00 = m00 * m11 - m01 * m10
+  const b01 = m00 * m12 - m02 * m10
+  const b02 = m00 * m13 - m03 * m10
+  const b03 = m01 * m12 - m02 * m11
+  const b04 = m01 * m13 - m03 * m11
+  const b05 = m02 * m13 - m03 * m12
+  const b06 = m20 * m31 - m21 * m30
+  const b07 = m20 * m32 - m22 * m30
+  const b08 = m20 * m33 - m23 * m30
+  const b09 = m21 * m32 - m22 * m31
+  const b10 = m21 * m33 - m23 * m31
+  const b11 = m22 * m33 - m23 * m32
+  const determinant = b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06
+  if (Math.abs(determinant) < 1e-8) return null
+  const inverseDet = 1 / determinant
+
+  out[0] = (m11 * b11 - m12 * b10 + m13 * b09) * inverseDet
+  out[1] = (m02 * b10 - m01 * b11 - m03 * b09) * inverseDet
+  out[2] = (m31 * b05 - m32 * b04 + m33 * b03) * inverseDet
+  out[3] = (m22 * b04 - m21 * b05 - m23 * b03) * inverseDet
+  out[4] = (m12 * b08 - m10 * b11 - m13 * b07) * inverseDet
+  out[5] = (m00 * b11 - m02 * b08 + m03 * b07) * inverseDet
+  out[6] = (m32 * b02 - m30 * b05 - m33 * b01) * inverseDet
+  out[7] = (m20 * b05 - m22 * b02 + m23 * b01) * inverseDet
+  out[8] = (m10 * b10 - m11 * b08 + m13 * b06) * inverseDet
+  out[9] = (m01 * b08 - m00 * b10 - m03 * b06) * inverseDet
+  out[10] = (m30 * b04 - m31 * b02 + m33 * b00) * inverseDet
+  out[11] = (m21 * b02 - m20 * b04 - m23 * b00) * inverseDet
+  out[12] = (m11 * b07 - m10 * b09 - m12 * b06) * inverseDet
+  out[13] = (m00 * b09 - m01 * b07 + m02 * b06) * inverseDet
+  out[14] = (m31 * b01 - m30 * b03 - m32 * b00) * inverseDet
+  out[15] = (m20 * b03 - m21 * b01 + m22 * b00) * inverseDet
+  return out
+}
+
 function createProgram(gl: WebGLRenderingContext): WebGLProgram | null {
   const vertexSource = `attribute vec3 position; uniform mat4 matrix; void main(){ gl_Position = matrix * vec4(position,1.0); }`
   const fragmentSource = `precision mediump float; uniform vec4 color; void main(){ gl_FragColor = color; }`
@@ -77,8 +118,7 @@ async function requestCompatibleSession(xr: NonNullable<XRNavigator['xr']>): Pro
     try {
       return await xr.requestSession('immersive-ar', options)
     } catch {
-      // Try the next, less restrictive feature set. Some Android AR browsers
-      // expose immersive-ar but reject local-floor or dom-overlay at startup.
+      // Try the next, less restrictive feature set.
     }
   }
   return null
@@ -153,9 +193,8 @@ export async function startWebXRAnimalSession(
       for (const view of pose.views) {
         const viewport = layer.getViewport(view)
         gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height)
-        // WebXR exposes transform as view-to-world. The renderer needs the
-        // inverse (world-to-view) matrix for the MVP calculation.
-        const viewMatrix = view.transform.inverse?.matrix ?? view.transform.matrix
+        const viewMatrix = view.transform.inverse?.matrix ?? invertMatrix(view.transform.matrix)
+        if (!viewMatrix) continue
         for (const animal of animals) {
           const world = toLocalWorldPosition(location, animal)
           if (world.distance > 1000) continue
