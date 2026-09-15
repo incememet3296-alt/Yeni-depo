@@ -14,11 +14,14 @@ import { useArSupport } from '../hooks/useArSupport'
 import { getHeading } from '../lib/compass'
 import { calculateAnimalPosition } from '../lib/animal-position'
 import { calculateDistance } from '../lib/distance'
+import { startWebXRAnimalSession } from '../lib/webxr-ar'
 import { ANIMALS } from '../data/animals'
 import type { Animal } from '../types/animal'
 
 const FIELD_OF_VIEW = 60
 const VERTICAL_FIELD_OF_VIEW = 45
+
+type WebXRSession = Awaited<ReturnType<typeof startWebXRAnimalSession>>
 
 interface CameraPageProps {
   onNavigate: (path: string) => void
@@ -32,6 +35,10 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
   const [selected, setSelected] = useState<Animal | null>(null)
   const [viewport, setViewport] = useState({ width: window.innerWidth, height: window.innerHeight })
   const [fallbackMode, setFallbackMode] = useState(false)
+  const [xrStarting, setXrStarting] = useState(false)
+  const [xrActive, setXrActive] = useState(false)
+  const [xrError, setXrError] = useState<string | null>(null)
+  const xrSessionRef = useRef<WebXRSession>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -41,6 +48,13 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
     return () => {
       window.removeEventListener('resize', onResize)
       window.removeEventListener('orientationchange', onResize)
+    }
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      void xrSessionRef.current?.end()
+      xrSessionRef.current = null
     }
   }, [])
 
@@ -61,6 +75,28 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
       }, heading),
     }))
   }, [location.data, heading])
+
+  const start3DAr = async () => {
+    if (!location.data || xrStarting || xrActive) return
+    setXrStarting(true)
+    setXrError(null)
+    try {
+      const session = await startWebXRAnimalSession(ANIMALS, location.data, () => {
+        xrSessionRef.current = null
+        setXrActive(false)
+      })
+      if (!session) {
+        setXrError('Bu cihaz veya tarayıcı gerçek WebXR AR modunu başlatamadı. Kamera + sensör modu kullanılabilir.')
+        return
+      }
+      xrSessionRef.current = session
+      setXrActive(true)
+    } catch {
+      setXrError('3D AR başlatılamadı. Kamera + sensör modu ile devam edebilirsin.')
+    } finally {
+      setXrStarting(false)
+    }
+  }
 
   const nearbyCount = animalPositions.filter((ap) => ap.position.visible).length
   const arUnsupported = arSupport.status === 'unsupported'
@@ -131,6 +167,15 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
                 />
               ))}
             </div>
+            {arSupport.webxrImmersiveAr && !xrActive && (
+              <button className="camera-3d-ar-button" onClick={() => void start3DAr()} disabled={xrStarting || !location.data}>
+                {xrStarting ? '3D AR başlatılıyor…' : '🥽 Gerçek 3D AR'}
+              </button>
+            )}
+            {xrActive && (
+              <div className="camera-3d-ar-active" role="status">🥽 3D AR aktif</div>
+            )}
+            {xrError && <StatusMessage type="warning" title="3D AR kullanılamadı" message={xrError} />}
           </>
         ) : (
           <CameraPermission onRequest={camera.start} />
