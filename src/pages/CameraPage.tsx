@@ -4,6 +4,7 @@ import { CameraView } from '../components/Camera/CameraView'
 import { CameraPermission } from '../components/Camera/CameraPermission'
 import { CameraStatus } from '../components/Camera/CameraStatus'
 import { AnimalMarker } from '../components/Animal/AnimalMarker'
+import { SensorArFallback } from '../components/Camera/SensorArFallback'
 import { AnimalInfo } from '../components/Animal/AnimalInfo'
 import { StatusMessage } from '../components/UI/StatusMessage'
 import { Button } from '../components/UI/Button'
@@ -142,18 +143,29 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
         {camera.state.status === 'ready' ? (
           <>
             <CameraView state={camera.state} />
-            <div className="ar-overlay">
-              {animalPositions.map((ap) => (
-                <AnimalMarker key={ap.animal.id} animal={ap.animal} position={ap.position} screenWidth={viewport.width} screenHeight={viewport.height} fieldOfView={FIELD_OF_VIEW} verticalFieldOfView={VERTICAL_FIELD_OF_VIEW} onSelect={() => setSelected(ap.animal)} />
-              ))}
-            </div>
+            {xrUnavailable ? (
+              <SensorArFallback
+                items={animalPositions}
+                screenWidth={viewport.width}
+                screenHeight={viewport.height}
+                fieldOfView={FIELD_OF_VIEW}
+                verticalFieldOfView={VERTICAL_FIELD_OF_VIEW}
+                onSelect={setSelected}
+              />
+            ) : (
+              <div className="ar-overlay">
+                {animalPositions.map((ap) => (
+                  <AnimalMarker key={ap.animal.id} animal={ap.animal} position={ap.position} screenWidth={viewport.width} screenHeight={viewport.height} fieldOfView={FIELD_OF_VIEW} verticalFieldOfView={VERTICAL_FIELD_OF_VIEW} onSelect={() => setSelected(ap.animal)} />
+                ))}
+              </div>
+            )}
             {arSupport.hasImmersiveAr && !xrActive && !xrUnavailable && (
               <button className="camera-3d-ar-button" onClick={() => void start3DAr()} disabled={xrStarting || !location.data}>
                 {xrStarting ? '3D AR başlatılıyor…' : '🥽 Gerçek 3D AR'}
               </button>
             )}
             {xrActive && <div className="camera-3d-ar-active" role="status">🥽 3D AR aktif</div>}
-            {xrUnavailable && <div className="camera-3d-ar-active" role="status">📱 Kamera + sensör 3D modu aktif</div>}
+            {xrUnavailable && <div className="camera-3d-ar-active camera-sensor-mode" role="status">📱 Kamera + sensör 3D modu aktif</div>}
           </>
         ) : (
           <CameraPermission onRequest={camera.start} />
