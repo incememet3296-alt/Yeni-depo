@@ -1,6 +1,5 @@
 import type { Animal, AnimalPosition, UserLocation } from '../types/animal'
-import { calculateDistance } from './distance'
-import { calculateBearing } from './bearing'
+import { toLocalWorldPosition } from './world-position'
 
 export const DISCOVERY_RADIUS = 1000
 
@@ -9,31 +8,28 @@ export function calculateAnimalPosition(
   user: UserLocation,
   heading: number,
 ): AnimalPosition {
-  const distance = calculateDistance(
-    user.latitude,
-    user.longitude,
-    animal.latitude,
-    animal.longitude,
+  const world = toLocalWorldPosition(
+    {
+      latitude: user.latitude,
+      longitude: user.longitude,
+      altitude: user.altitude,
+    },
+    {
+      latitude: animal.latitude,
+      longitude: animal.longitude,
+      altitude: animal.altitude,
+    },
   )
 
-  const bearing = calculateBearing(
-    user.latitude,
-    user.longitude,
-    animal.latitude,
-    animal.longitude,
-  )
-
-  const relativeBearing = normalizeAngle(bearing - heading)
-  const userAltitude = user.altitude ?? 0
-  const verticalAngle = Math.atan2(animal.altitude - userAltitude, Math.max(distance, 1)) * (180 / Math.PI)
+  const relativeBearing = normalizeAngle(world.bearing - heading)
 
   return {
     id: animal.id,
-    distance,
-    bearing,
+    distance: world.distance,
+    bearing: world.bearing,
     relativeBearing,
-    verticalAngle,
-    visible: distance <= DISCOVERY_RADIUS,
+    verticalAngle: world.elevation,
+    visible: world.distance <= DISCOVERY_RADIUS,
   }
 }
 
@@ -51,8 +47,7 @@ export function getScreenOffset(
 ): number {
   const maxOffset = screenWidth / 2
   const ratio = relativeBearing / (fieldOfView / 2)
-  const clamped = Math.max(-1, Math.min(1, ratio))
-  return clamped * maxOffset
+  return Math.max(-1, Math.min(1, ratio)) * maxOffset
 }
 
 export function getVerticalScreenOffset(
@@ -62,8 +57,7 @@ export function getVerticalScreenOffset(
 ): number {
   const maxOffset = screenHeight / 2
   const ratio = verticalAngle / (verticalFieldOfView / 2)
-  const clamped = Math.max(-1, Math.min(1, ratio))
-  return -clamped * maxOffset
+  return -Math.max(-1, Math.min(1, ratio)) * maxOffset
 }
 
 export function getDistanceScale(distance: number, maxDistance: number): number {
