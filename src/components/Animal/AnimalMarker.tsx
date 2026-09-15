@@ -1,5 +1,6 @@
 import type { Animal, AnimalPosition } from '../../types/animal'
 import { getScreenOffset, getVerticalScreenOffset, getDistanceScale, DISCOVERY_RADIUS } from '../../lib/animal-position'
+import { Animal3D } from './Animal3D'
 
 interface AnimalMarkerProps {
   animal: Animal
@@ -25,6 +26,7 @@ export function AnimalMarker({
   const offsetX = getScreenOffset(position.relativeBearing, fieldOfView, screenWidth)
   const offsetY = getVerticalScreenOffset(position.verticalAngle, verticalFieldOfView, screenHeight)
   const scale = getDistanceScale(position.distance, DISCOVERY_RADIUS)
+  const modelSize = Math.max(72, Math.min(128, 88 * scale))
 
   return (
     <div
@@ -40,7 +42,9 @@ export function AnimalMarker({
       tabIndex={0}
       aria-label={`${animal.name}, ${Math.round(position.distance)} metre`}
     >
-      <img src={animal.image} alt={animal.name} className="marker-image" />
+      <div className="animal-3d-shell" aria-hidden="true">
+        <Animal3D rarity={animal.rarity} size={modelSize} />
+      </div>
       <div className="marker-label">{animal.name}</div>
     </div>
   )
