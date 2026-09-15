@@ -1,7 +1,9 @@
 export interface OrientationData {
-  alpha: number | null // pusula yönü (0-360)
-  beta: number | null // ön-arka eğim (-180 to 180)
-  gamma: number | null // sol-sağ eğim (-90 to 90)
+  alpha: number | null
+  beta: number | null
+  gamma: number | null
+  compassHeading: number | null
+  absolute: boolean
 }
 
 export type OrientationStatus =
@@ -11,31 +13,32 @@ export type OrientationStatus =
   | 'permission-denied'
   | 'unsupported'
 
-export interface OrientationState {
-  status: OrientationStatus
-  data: OrientationData | null
-  error: string | null
+interface DeviceOrientationEventWithCompass extends DeviceOrientationEvent {
+  webkitCompassHeading?: number
+  webkitCompassAccuracy?: number
 }
 
 export function isOrientationSupported(): boolean {
-  return 'DeviceOrientationEvent' in window
+  return typeof window !== 'undefined' && 'DeviceOrientationEvent' in window
 }
 
 export function isOrientationPermissionRequired(): boolean {
-  return (
-    typeof (window.DeviceOrientationEvent as unknown as { requestPermission?: () => Promise<string> })
-      .requestPermission === 'function'
-  )
+  if (!isOrientationSupported()) return false
+  const evt = window.DeviceOrientationEvent as unknown as {
+    requestPermission?: () => Promise<string>
+  }
+  return typeof evt.requestPermission === 'function'
 }
 
 export async function requestOrientationPermission(): Promise<boolean> {
+  if (!isOrientationSupported()) return false
+
   const evt = window.DeviceOrientationEvent as unknown as {
     requestPermission?: () => Promise<string>
   }
   if (typeof evt.requestPermission === 'function') {
     try {
-      const result = await evt.requestPermission()
-      return result === 'granted'
+      return (await evt.requestPermission()) === 'granted'
     } catch {
       return false
     }
@@ -43,18 +46,24 @@ export async function requestOrientationPermission(): Promise<boolean> {
   return true
 }
 
-/**
- * DeviceOrientation listener başlatır. Callback her orientation değişiminde çağrılır.
- * Cleanup fonksiyonu döner.
- */
 export function startOrientation(
   onUpdate: (data: OrientationData) => void,
 ): () => void {
-  const handler = (e: DeviceOrientationEvent) => {
+  if (!isOrientationSupported()) return () => {}
+
+  const handler = (event: Event) => {
+    const e = event as DeviceOrientationEventWithCompass
+    const compassHeading =
+      typeof e.webkitCompassHeading === 'number' && Number.isFinite(e.webkitCompassHeading)
+        ? e.webkitCompassHeading
+        : null
+
     onUpdate({
       alpha: e.alpha,
       beta: e.beta,
       gamma: e.gamma,
+      compassHeading,
+      absolute: e.absolute,
     })
   }
 
