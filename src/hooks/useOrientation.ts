@@ -3,6 +3,7 @@ import {
   startOrientation,
   requestOrientationPermission,
   isOrientationPermissionRequired,
+  isOrientationSupported,
   type OrientationData,
   type OrientationStatus,
 } from '../lib/orientation'
@@ -15,50 +16,73 @@ interface OrientationHookState {
 }
 
 export function useOrientation(): OrientationHookState {
-  const [state, setState] = useState<Omit<OrientationHookState, 'requestPermission'>>(
-    {
-      status: 'idle',
-      data: null,
-      error: null,
-    },
-  )
+  const [state, setState] = useState<Omit<OrientationHookState, 'requestPermission'>>({
+    status: 'idle',
+    data: null,
+    error: null,
+  })
 
   const beginListening = useCallback(() => {
+    if (!isOrientationSupported()) {
+      setState((prev) => ({
+        ...prev,
+        status: 'unsupported',
+        error: 'Bu cihaz/tarayıcı cihaz yönelim sensörünü desteklemiyor.',
+      }))
+      return () => {}
+    }
+
     const cleanup = startOrientation((data) => {
-      setState((prev) => ({ ...prev, status: 'active', data, error: null }))
+      setState({ status: 'active', data, error: null })
     })
     return cleanup
   }, [])
 
   const requestPermission = useCallback(async () => {
+    if (!isOrientationSupported()) {
+      setState((prev) => ({
+        ...prev,
+        status: 'unsupported',
+        error: 'Bu cihaz/tarayıcı cihaz yönelim sensörünü desteklemiyor.',
+      }))
+      return false
+    }
+
     if (isOrientationPermissionRequired()) {
       const granted = await requestOrientationPermission()
       if (!granted) {
         setState((prev) => ({
           ...prev,
-          status: 'permission-denied' as OrientationStatus,
-          error: 'Pusula izni reddedildi.',
+          status: 'permission-denied',
+          error: 'Pusula/yön sensörü izni reddedildi.',
         }))
         return false
       }
     }
 
-    setState((prev) => ({ ...prev, status: 'active' as OrientationStatus }))
+    setState((prev) => ({ ...prev, status: 'active', error: null }))
     return true
   }, [])
 
   useEffect(() => {
+    if (!isOrientationSupported()) {
+      setState((prev) => ({
+        ...prev,
+        status: 'unsupported',
+        error: 'Bu cihaz/tarayıcı cihaz yönelim sensörünü desteklemiyor.',
+      }))
+      return
+    }
+
     if (!isOrientationPermissionRequired()) {
-      const cleanup = beginListening()
-      return cleanup
+      return beginListening()
     }
     return () => {}
   }, [beginListening])
 
   useEffect(() => {
     if (state.status === 'active' && !state.data) {
-      const cleanup = beginListening()
-      return cleanup
+      return beginListening()
     }
     return () => {}
   }, [state.status, state.data, beginListening])
