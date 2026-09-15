@@ -20,6 +20,8 @@ type XRNavigator = Navigator & {
   }
 }
 
+type XRWebGLLayerConstructor = new (session: XRSessionLike, gl: WebGLRenderingContext) => XRWebGLLayerLike
+
 function matrixMultiply(a: Float32Array, b: Float32Array): Float32Array {
   const out = new Float32Array(16)
   for (let column = 0; column < 4; column += 1) {
@@ -101,11 +103,12 @@ export async function startWebXRAnimalSession(
       return null
     }
 
-    const layer = new (window as unknown as { XRWebGLLayer?: new (session: XRSessionLike, gl: WebGLRenderingContext) => XRWebGLLayerLike }).XRWebGLLayer?.(session, gl)
-    if (!layer) {
+    const XRWebGLLayer = (window as unknown as { XRWebGLLayer?: XRWebGLLayerConstructor }).XRWebGLLayer
+    if (!XRWebGLLayer) {
       await session.end()
       return null
     }
+    const layer = new XRWebGLLayer(session, gl)
     session.updateRenderState({ baseLayer: layer })
 
     let referenceSpace: XRReferenceSpaceLike
