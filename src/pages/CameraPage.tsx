@@ -122,11 +122,11 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
   }, [filteredLocation, heading])
 
   const start3DAr = async () => {
-    if (!filteredLocation || xrStarting || xrActive) return
+    if (!filteredLocation || heading == null || xrStarting || xrActive) return
     setXrStarting(true)
     setXrUnavailable(false)
     try {
-      const session = await startWebXRAnimalSession(ANIMALS, filteredLocation, () => {
+      const session = await startWebXRAnimalSession(ANIMALS, { ...filteredLocation, heading }, () => {
         xrSessionRef.current = null
         setXrActive(false)
       })
@@ -202,7 +202,7 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
               </div>
             )}
             {arSupport.hasImmersiveAr && !xrActive && !xrUnavailable && (
-              <button className="camera-3d-ar-button" onClick={() => void start3DAr()} disabled={xrStarting || !filteredLocation}>
+              <button className="camera-3d-ar-button" onClick={() => void start3DAr()} disabled={xrStarting || !filteredLocation || heading == null}>
                 {xrStarting ? '3D AR başlatılıyor…' : '🥽 Gerçek 3D AR'}
               </button>
             )}
