@@ -20,41 +20,76 @@ export interface LocationState {
 }
 
 export function isLocationSupported(): boolean {
-  return 'geolocation' in navigator
+  return typeof navigator !== 'undefined' && 'geolocation' in navigator
 }
 
-/**
- * GPS watchPosition başlatır. Callback her güncellemede çağrılır.
- * Cleanup fonksiyonu döner - component unmount'ta çağrılmalı.
- */
+export function isSecureLocationContext(): boolean {
+  return (
+    typeof location !== 'undefined' &&
+    (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+  )
+}
+
 export function watchLocation(
   onUpdate: (data: LocationData) => void,
   onError: (error: string) => void,
 ): () => void {
   if (!isLocationSupported()) {
-    onError('Bu cihaz GPS desteklemiyor.')
+    onError('Bu cihaz konum API desteklemiyor.')
     return () => {}
   }
 
-  const watchId = navigator.geolocation.watchPosition(
-    (pos) => {
-      onUpdate({
-        latitude: pos.coords.latitude,
-        longitude: pos.coords.longitude,
-        accuracy: pos.coords.accuracy,
-        altitude: pos.coords.altitude,
-        heading: pos.coords.heading,
-      })
-    },
-    (err) => {
-      if (err.code === err.PERMISSION_DENIED) {
-        onError('Konum izni reddedildi.')
-      } else if (err.code === err.POSITION_UNAVAILABLE) {
-        onError('Konum bilgisi kullanılamıyor.')
-      } else {
-        onError(err.message || 'Konum hatası.')
-      }
-    },
+  if (!isSecureLocationContext()) {
+    onError('Konum için HTTPS bağlantısı gerekli.')
+    return () => {}
+  }
+
+  let primaryWatchId: number | null = null
+  let fallbackWatchId: number | null = null
+  let fallbackStarted = false
+
+  const handleUpdate = (pos: GeolocationPosition) => {
+    onUpdate({
+      latitude: pos.coords.latitude,
+      longitude: pos.coords.longitude,
+      accuracy: pos.coords.accuracy,
+      altitude: pos.coords.altitude,
+      heading: pos.coords.heading,
+    })
+  }
+
+  const handleError = (err: GeolocationPositionError) => {
+    if (err.code === err.PERMISSION_DENIED) {
+      onError('Konum izni reddedildi.')
+      return
+    }
+
+    if (!fallbackStarted && (err.code === err.POSITION_UNAVAILABLE || err.code === err.TIMEOUT)) {
+      fallbackStarted = true
+      fallbackWatchId = navigator.geolocation.watchPosition(
+        handleUpdate,
+        (fallbackError) => {
+          if (fallbackError.code === fallbackError.PERMISSION_DENIED) {
+            onError('Konum izni reddedildi.')
+          } else {
+            onError(fallbackError.message || 'Konum bilgisi kullanılamıyor.')
+          }
+        },
+        {
+          enableHighAccuracy: false,
+          maximumAge: 10000,
+          timeout: 30000,
+        },
+      )
+      return
+    }
+
+    onError(err.message || 'Konum hatası.')
+  }
+
+  primaryWatchId = navigator.geolocation.watchPosition(
+    handleUpdate,
+    handleError,
     {
       enableHighAccuracy: true,
       maximumAge: 1000,
@@ -62,5 +97,8 @@ export function watchLocation(
     },
   )
 
-  return () => navigator.geolocation.clearWatch(watchId)
+  return () => {
+    if (primaryWatchId != null) navigator.geolocation.clearWatch(primaryWatchId)
+    if (fallbackWatchId != null) navigator.geolocation.clearWatch(fallbackWatchId)
+  }
 }
