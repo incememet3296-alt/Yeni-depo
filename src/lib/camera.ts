@@ -14,17 +14,20 @@ export interface CameraState {
 }
 
 export function isCameraSupported(): boolean {
-  return !!(
-    navigator.mediaDevices && navigator.mediaDevices.getUserMedia
-  )
+  return typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia
 }
 
 export function isHttps(): boolean {
   return (
-    location.protocol === 'https:' ||
-    location.hostname === 'localhost' ||
-    location.hostname === '127.0.0.1'
+    typeof location !== 'undefined' &&
+    (location.protocol === 'https:' ||
+      location.hostname === 'localhost' ||
+      location.hostname === '127.0.0.1')
   )
+}
+
+async function requestCamera(constraints: MediaStreamConstraints): Promise<MediaStream> {
+  return navigator.mediaDevices.getUserMedia(constraints)
 }
 
 export async function startCamera(): Promise<CameraState> {
@@ -44,38 +47,53 @@ export async function startCamera(): Promise<CameraState> {
     }
   }
 
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' } },
-      audio: false,
-    })
-    return { status: 'ready', stream, error: null }
-  } catch (err) {
-    const error = err as DOMException
-    if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
-      return {
-        status: 'permission-denied',
-        stream: null,
-        error: 'Kamera izni reddedildi. Tarayıcı ayarlarından izin verin.',
+  const attempts: MediaStreamConstraints[] = [
+    { video: { facingMode: { ideal: 'environment' } }, audio: false },
+    { video: { facingMode: 'environment' }, audio: false },
+    { video: true, audio: false },
+  ]
+
+  let lastError: unknown = null
+  for (const constraints of attempts) {
+    try {
+      const stream = await requestCamera(constraints)
+      return { status: 'ready', stream, error: null }
+    } catch (err) {
+      lastError = err
+      const error = err as DOMException
+      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+        return {
+          status: 'permission-denied',
+          stream: null,
+          error: 'Kamera izni reddedildi. Tarayıcı ayarlarından kamera iznini verin.',
+        }
+      }
+      if (error.name === 'SecurityError') {
+        return {
+          status: 'https-required',
+          stream: null,
+          error: 'Tarayıcı güvenlik nedeniyle kameraya erişemedi. HTTPS bağlantısını kontrol edin.',
+        }
       }
     }
-    if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
-      return {
-        status: 'unsupported',
-        stream: null,
-        error: 'Kamera bulunamadı.',
-      }
-    }
+  }
+
+  const error = lastError as DOMException | null
+  if (error?.name === 'NotFoundError' || error?.name === 'DevicesNotFoundError') {
     return {
-      status: 'error',
+      status: 'unsupported',
       stream: null,
-      error: error.message || 'Kamera başlatılamadı.',
+      error: 'Kamera bulunamadı.',
     }
+  }
+
+  return {
+    status: 'error',
+    stream: null,
+    error: error?.message || 'Kamera başlatılamadı.',
   }
 }
 
 export function stopCamera(stream: MediaStream | null): void {
-  if (stream) {
-    stream.getTracks().forEach((track) => track.stop())
-  }
+  stream?.getTracks().forEach((track) => track.stop())
 }
