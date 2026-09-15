@@ -1,37 +1,36 @@
 import type { OrientationData } from './orientation'
 
+export function normalizeHeading(value: number): number {
+  const normalized = value % 360
+  return normalized < 0 ? normalized + 360 : normalized
+}
+
 /**
- * Alpha değerinden pusula yönünü (heading) hesaplar.
- * iOS ve Android farklılık gösterir:
- * - Android: alpha zaten pusula yönüne yakındır (webkitCompassHeading varsa onu kullan)
- * - iOS: webkitCompassHeading kullanılır (alpha ters çalışır)
- *
- * 0 = Kuzey, 90 = Doğu, 180 = Güney, 270 = Batı
+ * Returns a clockwise heading: 0 = north, 90 = east, 180 = south, 270 = west.
+ * iOS exposes webkitCompassHeading; Android browsers generally provide alpha.
  */
 export function getHeading(
   orientation: OrientationData | null,
-  compassHeading?: number | null,
+  locationHeading?: number | null,
 ): number | null {
-  if (compassHeading != null && !isNaN(compassHeading)) {
-    return compassHeading
+  if (orientation?.compassHeading != null) {
+    return normalizeHeading(orientation.compassHeading)
   }
 
-  if (orientation && orientation.alpha != null && !isNaN(orientation.alpha)) {
-    return 360 - orientation.alpha
+  if (locationHeading != null && Number.isFinite(locationHeading)) {
+    return normalizeHeading(locationHeading)
+  }
+
+  if (orientation?.alpha != null && Number.isFinite(orientation.alpha)) {
+    // DeviceOrientation alpha is clockwise around the z-axis. For browsers
+    // without a calibrated compass value, this is the best available fallback.
+    return normalizeHeading(360 - orientation.alpha)
   }
 
   return null
 }
 
-/**
- * Yön derecesine göre pusula etiketi döndürür.
- */
 export function getCompassLabel(heading: number): string {
-  const directions = [
-    'K', 'KD', 'D', 'GD', 'G', 'GB', 'B', 'KB',
-  'K',
-  ]
-
-  const index = Math.round(heading / 45) % 8
-  return directions[index]
+  const directions = ['K', 'KD', 'D', 'GD', 'G', 'GB', 'B', 'KB']
+  return directions[Math.round(normalizeHeading(heading) / 45) % 8]
 }
