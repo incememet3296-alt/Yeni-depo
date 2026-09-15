@@ -17,6 +17,7 @@ import { calculateDistance } from '../lib/distance'
 import { startWebXRAnimalSession } from '../lib/webxr-ar'
 import { ANIMALS } from '../data/animals'
 import type { Animal } from '../types/animal'
+import '../styles/ar-3d.css'
 
 const FIELD_OF_VIEW = 60
 const VERTICAL_FIELD_OF_VIEW = 45
@@ -108,29 +109,18 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
         <Header title="Keşif Modu" showBack onBack={() => onNavigate('/')} />
         <div className="fallback-mode">
           <div className="fallback-icon" aria-hidden="true">🧭</div>
-          <StatusMessage
-            type="info"
-            title="Uyumluluk modu"
-            message="Cihaz gelişmiş sensörleri desteklemese bile yakındaki sanal hayvanları keşfedebilirsin."
-          />
+          <StatusMessage type="info" title="Uyumluluk modu" message="Cihaz gelişmiş sensörleri desteklemese bile yakındaki sanal hayvanları keşfedebilirsin." />
           <p>Aşağıdaki listede yakındaki hayvanları görebilirsin.</p>
           <div className="fallback-list">
             {animalPositions.length > 0 ? (
               animalPositions.filter((ap) => ap.position.visible).map((ap) => (
                 <div key={ap.animal.id} className="fallback-animal">
                   <img src={ap.animal.image} alt={ap.animal.name} />
-                  <div>
-                    <strong>{ap.animal.name}</strong>
-                    <span>{Math.round(ap.position.distance)}m - {ap.position.bearing.toFixed(0)}°</span>
-                  </div>
+                  <div><strong>{ap.animal.name}</strong><span>{Math.round(ap.position.distance)}m - {ap.position.bearing.toFixed(0)}°</span></div>
                 </div>
               ))
             ) : (
-              <p className="fallback-empty">
-                {location.status === 'permission-denied'
-                  ? 'Konum izni reddedildi. Yakındaki hayvanları görmek için konum izni verin.'
-                  : 'Konum alınıyor veya yakında hayvan yok.'}
-              </p>
+              <p className="fallback-empty">{location.status === 'permission-denied' ? 'Konum izni reddedildi. Yakındaki hayvanları görmek için konum izni verin.' : 'Konum alınıyor veya yakında hayvan yok.'}</p>
             )}
           </div>
           <Button variant="secondary" onClick={() => onNavigate('/explore')}>Keşfet Sayfasına Git</Button>
@@ -143,9 +133,7 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
     <div className="camera-page" ref={containerRef}>
       <div className="camera-top-bar">
         <button className="camera-back" onClick={() => onNavigate('/')} aria-label="Geri">←</button>
-        <div className="gps-info">
-          <span>{location.data ? `📍 ±${Math.round(location.data.accuracy)}m` : '📍 Konum bekleniyor...'}</span>
-        </div>
+        <div className="gps-info"><span>{location.data ? `📍 ±${Math.round(location.data.accuracy)}m` : '📍 Konum bekleniyor...'}</span></div>
         <CameraStatus state={camera.state} />
       </div>
 
@@ -155,16 +143,7 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
             <CameraView state={camera.state} />
             <div className="ar-overlay">
               {animalPositions.map((ap) => (
-                <AnimalMarker
-                  key={ap.animal.id}
-                  animal={ap.animal}
-                  position={ap.position}
-                  screenWidth={viewport.width}
-                  screenHeight={viewport.height}
-                  fieldOfView={FIELD_OF_VIEW}
-                  verticalFieldOfView={VERTICAL_FIELD_OF_VIEW}
-                  onSelect={() => setSelected(ap.animal)}
-                />
+                <AnimalMarker key={ap.animal.id} animal={ap.animal} position={ap.position} screenWidth={viewport.width} screenHeight={viewport.height} fieldOfView={FIELD_OF_VIEW} verticalFieldOfView={VERTICAL_FIELD_OF_VIEW} onSelect={() => setSelected(ap.animal)} />
               ))}
             </div>
             {arSupport.hasImmersiveAr && !xrActive && (
@@ -172,39 +151,21 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
                 {xrStarting ? '3D AR başlatılıyor…' : '🥽 Gerçek 3D AR'}
               </button>
             )}
-            {xrActive && (
-              <div className="camera-3d-ar-active" role="status">🥽 3D AR aktif</div>
-            )}
+            {xrActive && <div className="camera-3d-ar-active" role="status">🥽 3D AR aktif</div>}
             {xrError && <StatusMessage type="warning" title="3D AR kullanılamadı" message={xrError} />}
           </>
         ) : (
           <CameraPermission onRequest={camera.start} />
         )}
 
-        {camera.state.status === 'permission-denied' && (
-          <StatusMessage type="error" title="Kamera İzni Reddedildi" message="Tarayıcı ayarlarından kamera iznini verin ve tekrar deneyin." action={{ label: 'Tekrar Dene', onClick: camera.start }} />
-        )}
-        {camera.state.status === 'https-required' && (
-          <StatusMessage type="warning" title="HTTPS Gerekli" message="Kamera API'si için HTTPS bağlantısı zorunludur." />
-        )}
-        {camera.state.status === 'unsupported' && (
-          <StatusMessage type="error" title="Kamera Desteklenmiyor" message="Bu cihaz veya tarayıcı kamera API desteklemiyor." action={{ label: 'Keşif Modunu Aç', onClick: () => setFallbackMode(true) }} />
-        )}
-        {camera.state.status === 'error' && (
-          <StatusMessage type="error" title="Kamera Kullanılamıyor" message={camera.state.error || 'Bilinmeyen hata.'} action={{ label: 'Tekrar Dene', onClick: camera.start }} />
-        )}
-        {orientation.status === 'permission-required' && (
-          <StatusMessage type="warning" title="Pusula İzni Gerekli" message="Hayvanların yönünü doğru göstermek için sensör izni gerekiyor." action={{ label: 'İzin İste', onClick: () => orientation.requestPermission() }} />
-        )}
-        {orientation.status === 'permission-denied' && (
-          <StatusMessage type="warning" title="Pusula İzni Reddedildi" message="Yön sensörü izni olmadan GPS tabanlı keşif devam eder." />
-        )}
-        {location.status === 'permission-denied' && (
-          <StatusMessage type="warning" title="Konum İzni Gerekli" message="Sanal hayvanları gerçek dünyadaki konumlarına göre göstermek için konum erişimine izin ver." />
-        )}
-        {location.data && location.data.accuracy > 100 && (
-          <StatusMessage type="info" title="GPS Doğruluğu Düşük" message={`GPS doğruluğu ±${Math.round(location.data.accuracy)}m. Daha iyi sonuç için açık alana çıkın.`} />
-        )}
+        {camera.state.status === 'permission-denied' && <StatusMessage type="error" title="Kamera İzni Reddedildi" message="Tarayıcı ayarlarından kamera iznini verin ve tekrar deneyin." action={{ label: 'Tekrar Dene', onClick: camera.start }} />}
+        {camera.state.status === 'https-required' && <StatusMessage type="warning" title="HTTPS Gerekli" message="Kamera API'si için HTTPS bağlantısı zorunludur." />}
+        {camera.state.status === 'unsupported' && <StatusMessage type="error" title="Kamera Desteklenmiyor" message="Bu cihaz veya tarayıcı kamera API desteklemiyor." action={{ label: 'Keşif Modunu Aç', onClick: () => setFallbackMode(true) }} />}
+        {camera.state.status === 'error' && <StatusMessage type="error" title="Kamera Kullanılamıyor" message={camera.state.error || 'Bilinmeyen hata.'} action={{ label: 'Tekrar Dene', onClick: camera.start }} />}
+        {orientation.status === 'permission-required' && <StatusMessage type="warning" title="Pusula İzni Gerekli" message="Hayvanların yönünü doğru göstermek için sensör izni gerekiyor." action={{ label: 'İzin İste', onClick: () => orientation.requestPermission() }} />}
+        {orientation.status === 'permission-denied' && <StatusMessage type="warning" title="Pusula İzni Reddedildi" message="Yön sensörü izni olmadan GPS tabanlı keşif devam eder." />}
+        {location.status === 'permission-denied' && <StatusMessage type="warning" title="Konum İzni Gerekli" message="Sanal hayvanları gerçek dünyadaki konumlarına göre göstermek için konum erişimine izin ver." />}
+        {location.data && location.data.accuracy > 100 && <StatusMessage type="info" title="GPS Doğruluğu Düşük" message={`GPS doğruluğu ±${Math.round(location.data.accuracy)}m. Daha iyi sonuç için açık alana çıkın.`} />}
       </div>
 
       <div className="camera-bottom-bar">
@@ -213,13 +174,7 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
         <button className="camera-nav-btn" onClick={() => onNavigate('/animals')}>🐾 Hayvanlarım</button>
       </div>
 
-      <AnimalInfo
-        animal={selected}
-        distance={selected && location.data ? calculateDistance(location.data.latitude, location.data.longitude, selected.latitude, selected.longitude) : undefined}
-        onClose={() => setSelected(null)}
-        onApproach={() => setSelected(null)}
-        onInspect={() => { setSelected(null); onNavigate('/animals') }}
-      />
+      <AnimalInfo animal={selected} distance={selected && location.data ? calculateDistance(location.data.latitude, location.data.longitude, selected.latitude, selected.longitude) : undefined} onClose={() => setSelected(null)} onApproach={() => setSelected(null)} onInspect={() => { setSelected(null); onNavigate('/animals') }} />
     </div>
   )
 }
