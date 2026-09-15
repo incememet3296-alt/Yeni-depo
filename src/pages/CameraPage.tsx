@@ -64,14 +64,15 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
   }, [orientation.data, location.data?.heading])
 
   const animalPositions = useMemo(() => {
-    if (!location.data || heading == null) return []
+    const currentLocation = location.data
+    if (!currentLocation || heading == null) return []
     return ANIMALS.map((animal) => ({
       animal,
       position: calculateAnimalPosition(animal, {
-        latitude: location.data.latitude,
-        longitude: location.data.longitude,
-        accuracy: location.data.accuracy,
-        altitude: location.data.altitude,
+        latitude: currentLocation.latitude,
+        longitude: currentLocation.longitude,
+        accuracy: currentLocation.accuracy,
+        altitude: currentLocation.altitude,
         heading,
       }, heading),
     }))
@@ -87,15 +88,12 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
         setXrActive(false)
       })
       if (!session) {
-        // WebXR can be reported as supported while the browser still rejects
-        // immersive-ar at runtime. Keep the camera/sensor 3D mode active.
         setXrUnavailable(true)
         return
       }
       xrSessionRef.current = session
       setXrActive(true)
     } catch {
-      // Never block discovery when native WebXR is unavailable.
       setXrUnavailable(true)
     } finally {
       setXrStarting(false)
