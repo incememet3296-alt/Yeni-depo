@@ -18,11 +18,14 @@ import { calculateDistance } from '../lib/distance'
 import { startWebXRAnimalSession } from '../lib/webxr-ar'
 import { ANIMALS } from '../data/animals'
 import type { Animal } from '../types/animal'
+import type { LocationData } from '../lib/location'
 import '../styles/ar-3d.css'
 
 const FIELD_OF_VIEW = 60
 const VERTICAL_FIELD_OF_VIEW = 45
 const HEADING_SMOOTHING = 0.18
+const LOCATION_SMOOTHING_MIN = 0.12
+const LOCATION_SMOOTHING_MAX = 0.45
 
 type WebXRSession = Awaited<ReturnType<typeof startWebXRAnimalSession>>
 
@@ -34,6 +37,22 @@ function smoothCircularHeading(previous: number | null, current: number): number
   if (previous == null) return normalizeHeading(current)
   const delta = ((current - previous + 540) % 360) - 180
   return normalizeHeading(previous + delta * HEADING_SMOOTHING)
+}
+
+function smoothLocation(previous: LocationData | null, current: LocationData): LocationData {
+  if (!previous) return current
+
+  const accuracyRatio = Math.min(Math.max(current.accuracy / 50, 0), 1)
+  const alpha = LOCATION_SMOOTHING_MAX - accuracyRatio * (LOCATION_SMOOTHING_MAX - LOCATION_SMOOTHING_MIN)
+
+  return {
+    ...current,
+    latitude: previous.latitude + (current.latitude - previous.latitude) * alpha,
+    longitude: previous.longitude + (current.longitude - previous.longitude) * alpha,
+    altitude: previous.altitude == null || current.altitude == null
+      ? current.altitude
+      : previous.altitude + (current.altitude - previous.altitude) * alpha,
+  }
 }
 
 export function CameraPage({ onNavigate }: CameraPageProps) {
@@ -50,6 +69,7 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
   const xrSessionRef = useRef<WebXRSession>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const headingRef = useRef<number | null>(null)
+  const locationRef = useRef<LocationData | null>(null)
 
   useEffect(() => {
     const onResize = () => setViewport({ width: window.innerWidth, height: window.innerHeight })
@@ -68,9 +88,16 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
     }
   }, [])
 
+  const filteredLocation = useMemo(() => {
+    if (!location.data) return null
+    const next = smoothLocation(locationRef.current, location.data)
+    locationRef.current = next
+    return next
+  }, [location.data])
+
   const rawHeading = useMemo(() => {
-    return getHeading(orientation.data, location.data?.heading)
-  }, [orientation.data, location.data?.heading])
+    return getHeading(orientation.data, filteredLocation?.heading)
+  }, [orientation.data, filteredLocation?.heading])
 
   const heading = useMemo(() => {
     if (rawHeading == null) return null
@@ -80,7 +107,7 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
   }, [rawHeading])
 
   const animalPositions = useMemo(() => {
-    const currentLocation = location.data
+    const currentLocation = filteredLocation
     if (!currentLocation || heading == null) return []
     return ANIMALS.map((animal) => ({
       animal,
@@ -92,14 +119,14 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
         heading,
       }, heading),
     }))
-  }, [location.data, heading])
+  }, [filteredLocation, heading])
 
   const start3DAr = async () => {
-    if (!location.data || xrStarting || xrActive) return
+    if (!filteredLocation || xrStarting || xrActive) return
     setXrStarting(true)
     setXrUnavailable(false)
     try {
-      const session = await startWebXRAnimalSession(ANIMALS, location.data, () => {
+      const session = await startWebXRAnimalSession(ANIMALS, filteredLocation, () => {
         xrSessionRef.current = null
         setXrActive(false)
       })
@@ -150,7 +177,7 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
     <div className="camera-page" ref={containerRef}>
       <div className="camera-top-bar">
         <button className="camera-back" onClick={() => onNavigate('/')} aria-label="Geri">←</button>
-        <div className="gps-info"><span>{location.data ? `📍 ±${Math.round(location.data.accuracy)}m` : '📍 Konum bekleniyor...'}</span></div>
+        <div className="gps-info"><span>{filteredLocation ? `📍 ±${Math.round(filteredLocation.accuracy)}m` : '📍 Konum bekleniyor...'}</span></div>
         <CameraStatus state={camera.state} />
       </div>
 
@@ -175,7 +202,7 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
               </div>
             )}
             {arSupport.hasImmersiveAr && !xrActive && !xrUnavailable && (
-              <button className="camera-3d-ar-button" onClick={() => void start3DAr()} disabled={xrStarting || !location.data}>
+              <button className="camera-3d-ar-button" onClick={() => void start3DAr()} disabled={xrStarting || !filteredLocation}>
                 {xrStarting ? '3D AR başlatılıyor…' : '🥽 Gerçek 3D AR'}
               </button>
             )}
@@ -193,7 +220,7 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
         {orientation.status === 'permission-required' && <StatusMessage type="warning" title="Pusula İzni Gerekli" message="Hayvanların yönünü doğru göstermek için sensör izni gerekiyor." action={{ label: 'İzin İste', onClick: () => orientation.requestPermission() }} />}
         {orientation.status === 'permission-denied' && <StatusMessage type="warning" title="Pusula İzni Reddedildi" message="Yön sensörü izni olmadan GPS tabanlı keşif devam eder." />}
         {location.status === 'permission-denied' && <StatusMessage type="warning" title="Konum İzni Gerekli" message="Sanal hayvanları gerçek dünyadaki konumlarına göre göstermek için konum erişimine izin ver." />}
-        {location.data && location.data.accuracy > 100 && <StatusMessage type="info" title="GPS Doğruluğu Düşük" message={`GPS doğruluğu ±${Math.round(location.data.accuracy)}m. Daha iyi sonuç için açık alana çıkın.`} />}
+        {filteredLocation && filteredLocation.accuracy > 100 && <StatusMessage type="info" title="GPS Doğruluğu Düşük" message={`GPS doğruluğu ±${Math.round(filteredLocation.accuracy)}m. Daha iyi sonuç için açık alana çıkın.`} />}
       </div>
 
       <div className="camera-bottom-bar">
@@ -202,7 +229,7 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
         <button className="camera-nav-btn" onClick={() => onNavigate('/animals')}>🐾 Hayvanlarım</button>
       </div>
 
-      <AnimalInfo animal={selected} distance={selected && location.data ? calculateDistance(location.data.latitude, location.data.longitude, selected.latitude, selected.longitude) : undefined} onClose={() => setSelected(null)} onApproach={() => setSelected(null)} onInspect={() => { setSelected(null); onNavigate('/animals') }} />
+      <AnimalInfo animal={selected} distance={selected && filteredLocation ? calculateDistance(filteredLocation.latitude, filteredLocation.longitude, selected.latitude, selected.longitude) : undefined} onClose={() => setSelected(null)} onApproach={() => setSelected(null)} onInspect={() => { setSelected(null); onNavigate('/animals') }} />
     </div>
   )
 }
