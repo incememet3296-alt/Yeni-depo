@@ -1,4 +1,5 @@
 import { toLocalWorldPosition } from './world-position'
+import { normalizeHeading } from './compass'
 import type { Animal, UserLocation } from '../types/animal'
 
 interface XRReferenceSpaceLike {}
@@ -50,7 +51,7 @@ function invertMatrix(matrix: Float32Array): Float32Array | null {
   const b05 = m02 * m13 - m03 * m12
   const b06 = m20 * m31 - m21 * m30
   const b07 = m20 * m32 - m22 * m30
-  const b08 = m20 * m33 - m23 * m30
+  const b08 = m20 * m33 - m22 * m30
   const b09 = m21 * m32 - m22 * m31
   const b10 = m21 * m33 - m23 * m31
   const b11 = m22 * m33 - m23 * m32
@@ -107,6 +108,15 @@ function modelMatrix(x: number, y: number, z: number, scale: number): Float32Arr
   ])
 }
 
+function geoToXrPosition(east: number, north: number, up: number, heading: number) {
+  const radians = normalizeHeading(heading) * Math.PI / 180
+  const cos = Math.cos(radians)
+  const sin = Math.sin(radians)
+  const right = east * cos - north * sin
+  const forward = east * sin + north * cos
+  return { x: right, y: up, z: -forward }
+}
+
 async function requestCompatibleSession(xr: NonNullable<XRNavigator['xr']>): Promise<XRSessionLike | null> {
   const attempts = [
     { requiredFeatures: ['local-floor'], optionalFeatures: ['dom-overlay'] },
@@ -127,6 +137,7 @@ async function requestCompatibleSession(xr: NonNullable<XRNavigator['xr']>): Pro
 export async function startWebXRAnimalSession(
   animals: Animal[],
   location: UserLocation,
+  heading: number,
   onEnd?: () => void,
 ): Promise<XRSessionLike | null> {
   const xr = (typeof navigator !== 'undefined' ? navigator : null) as XRNavigator | null
@@ -198,10 +209,11 @@ export async function startWebXRAnimalSession(
         for (const animal of animals) {
           const world = toLocalWorldPosition(location, animal)
           if (world.distance > 1000) continue
+          const xrPosition = geoToXrPosition(world.east, world.north, world.up, heading)
           const transform = modelMatrix(
-            world.east,
-            world.up + 1.2,
-            -world.north,
+            xrPosition.x,
+            xrPosition.y + 1.2,
+            xrPosition.z,
             Math.max(0.25, Math.min(2.5, 8 / Math.max(3, world.distance))),
           )
           const mvp = matrixMultiply(view.projectionMatrix, matrixMultiply(viewMatrix, transform))
