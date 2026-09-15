@@ -19,6 +19,7 @@ export interface AnimalPosition {
   distance: number
   bearing: number
   relativeBearing: number
+  verticalAngle: number
   visible: boolean
 }
 
