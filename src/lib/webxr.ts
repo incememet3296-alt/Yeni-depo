@@ -4,6 +4,12 @@ export interface WebXRArSupport {
   reason?: string
 }
 
+type XRSessionInitCompat = {
+  requiredFeatures?: string[]
+  optionalFeatures?: string[]
+  domOverlay?: { root: Element }
+}
+
 export async function checkWebXRArSupport(): Promise<WebXRArSupport> {
   if (typeof window === 'undefined' || typeof navigator === 'undefined') {
     return { available: false, immersiveAr: false, reason: 'Tarayıcı ortamı yok' }
@@ -27,7 +33,7 @@ export async function startImmersiveAr(overlayRoot?: HTMLElement): Promise<XRSes
   const support = await checkWebXRArSupport()
   if (!support.immersiveAr || !navigator.xr) return null
 
-  const attempts: XRSessionInit[] = [
+  const attempts: XRSessionInitCompat[] = [
     {
       requiredFeatures: ['local-floor'],
       optionalFeatures: ['dom-overlay'],
