@@ -16,13 +16,19 @@ function offsetCoordinate(latitude: number, longitude: number, distanceMeters: n
 
 /**
  * Returns the user's pet position relative to the user's live phone location.
- * The bearing used for the side offset is supplied separately from the live
- * compass heading. This is important: rotating the phone must NOT rotate the
- * pet around the user or pin it to a fixed screen position.
+ * The pet is anchored to a small angle beside the user's initial facing
+ * direction rather than a full 90-degree side offset. This keeps it inside
+ * the camera field of view while preserving a real-world bearing: rotating
+ * the phone changes the screen position of the pet instead of rotating the
+ * pet around the user with the camera.
  */
 export function getFollowingPetLocation(user: UserLocation, animal: Animal, anchorHeading: number) {
   if (!animal.isOwned) return { latitude: animal.latitude, longitude: animal.longitude, altitude: animal.altitude }
-  const sideBearing = (anchorHeading + 90 + 360) % 360
+
+  // About 20 degrees left of the user's initial facing direction. A 90-degree
+  // offset put the companion outside a typical 60-degree camera FOV and made
+  // it look permanently stuck to the right edge of the screen.
+  const sideBearing = (anchorHeading - 20 + 360) % 360
   const point = offsetCoordinate(user.latitude, user.longitude, Math.max(0.8, animal.followDistanceM), sideBearing)
   return { latitude: point.latitude, longitude: point.longitude, altitude: (user.altitude ?? animal.altitude) + 0.05 }
 }
