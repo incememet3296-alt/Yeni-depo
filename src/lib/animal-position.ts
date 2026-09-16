@@ -14,19 +14,21 @@ function offsetCoordinate(latitude: number, longitude: number, distanceMeters: n
   return { latitude: targetLat * 180 / Math.PI, longitude: targetLon * 180 / Math.PI }
 }
 
-/** Returns the user's pet position relative to the user's live phone location.
- * The pet is intentionally not anchored to a fixed world coordinate: it follows
- * the owner at a stable side distance while preserving AR world-space behavior.
+/**
+ * Returns the user's pet position relative to the user's live phone location.
+ * The bearing used for the side offset is supplied separately from the live
+ * compass heading. This is important: rotating the phone must NOT rotate the
+ * pet around the user or pin it to a fixed screen position.
  */
-export function getFollowingPetLocation(user: UserLocation, animal: Animal, heading: number) {
+export function getFollowingPetLocation(user: UserLocation, animal: Animal, anchorHeading: number) {
   if (!animal.isOwned) return { latitude: animal.latitude, longitude: animal.longitude, altitude: animal.altitude }
-  const sideBearing = (heading + 90) % 360
+  const sideBearing = (anchorHeading + 90 + 360) % 360
   const point = offsetCoordinate(user.latitude, user.longitude, Math.max(0.8, animal.followDistanceM), sideBearing)
   return { latitude: point.latitude, longitude: point.longitude, altitude: (user.altitude ?? animal.altitude) + 0.05 }
 }
 
-export function calculateAnimalPosition(animal: Animal, user: UserLocation, heading: number): AnimalPosition {
-  const petLocation = getFollowingPetLocation(user, animal, heading)
+export function calculateAnimalPosition(animal: Animal, user: UserLocation, heading: number, anchorHeading = heading): AnimalPosition {
+  const petLocation = getFollowingPetLocation(user, animal, anchorHeading)
   const world = toLocalWorldPosition(
     { latitude: user.latitude, longitude: user.longitude, altitude: user.altitude },
     petLocation,
