@@ -12,6 +12,9 @@ export interface Animal {
   rarity: Rarity
   level: number
   isOwned: boolean
+  priceTl: number
+  isForSale: boolean
+  followDistanceM: number
 }
 
 export interface AnimalPosition {
