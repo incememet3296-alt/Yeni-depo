@@ -33,15 +33,16 @@ export function AnimalMarker({
 
   const offsetX = getScreenOffset(position.relativeBearing, fieldOfView, screenWidth)
   const offsetY = getVerticalScreenOffset(position.verticalAngle, verticalFieldOfView, screenHeight)
-  const scale = getDistanceScale(position.distance, DISCOVERY_RADIUS)
-  const modelSize = Math.max(88, Math.min(150, 104 * Math.max(scale, 0.9)))
+  const scale = Math.max(getDistanceScale(position.distance, DISCOVERY_RADIUS), 0.9)
+  const modelSize = Math.max(96, Math.min(150, 108 * scale))
   const icon = ANIMAL_ICONS[animal.id] ?? '🐾'
 
   return (
     <div
       className="animal-marker"
       style={{
-        transform: `translate(${offsetX}px, ${offsetY}px) scale(${Math.max(scale, 0.9)})`,
+        transform: `translate(${offsetX}px, ${offsetY}px) scale(${scale})`,
+        zIndex: 25,
       }}
       onClick={onSelect}
       onKeyDown={(event) => {
@@ -52,7 +53,23 @@ export function AnimalMarker({
       aria-label={`${animal.name}, ${Math.round(position.distance)} metre`}
     >
       <div className="animal-3d-shell" aria-hidden="true">
-        <div className="animal-visual-fallback" aria-hidden="true">{icon}</div>
+        <div
+          className="animal-visual-fallback"
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 10,
+            display: 'grid',
+            placeItems: 'center',
+            fontSize: '96px',
+            lineHeight: 1,
+            opacity: 1,
+            visibility: 'visible',
+          }}
+        >
+          {icon}
+        </div>
         <Animal3D rarity={animal.rarity} size={modelSize} />
       </div>
       <div className="marker-label">{animal.name}</div>
