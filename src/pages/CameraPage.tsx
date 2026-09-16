@@ -187,14 +187,7 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
           <>
             <CameraView state={camera.state} />
             {xrUnavailable ? (
-              <SensorArFallback
-                items={animalPositions}
-                screenWidth={viewport.width}
-                screenHeight={viewport.height}
-                fieldOfView={FIELD_OF_VIEW}
-                verticalFieldOfView={VERTICAL_FIELD_OF_VIEW}
-                onSelect={setSelected}
-              />
+              <SensorArFallback items={animalPositions} screenWidth={viewport.width} screenHeight={viewport.height} fieldOfView={FIELD_OF_VIEW} verticalFieldOfView={VERTICAL_FIELD_OF_VIEW} onSelect={setSelected} />
             ) : (
               <div className="ar-overlay">
                 {animalPositions.map((ap) => (
