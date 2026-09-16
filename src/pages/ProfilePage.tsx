@@ -1,8 +1,10 @@
-import { ANIMALS } from '../data/animals'
+import { useAnimals } from '../hooks/useAnimals'
 
 export function ProfilePage() {
-  const owned = ANIMALS.filter((a) => a.isOwned).length
-  const total = ANIMALS.length
+  const { animals, loading } = useAnimals()
+  const owned = animals.filter((animal) => animal.isOwned).length
+  const total = animals.length
+  const completion = total > 0 ? Math.round((owned / total) * 100) : 0
 
   return (
     <div className="profile-page">
@@ -14,15 +16,15 @@ export function ProfilePage() {
 
       <div className="profile-stats">
         <div className="profile-stat">
-          <span className="stat-number">{owned}</span>
+          <span className="stat-number">{loading ? '—' : owned}</span>
           <span className="stat-text">Sahiplenilen</span>
         </div>
         <div className="profile-stat">
-          <span className="stat-number">{total}</span>
+          <span className="stat-number">{loading ? '—' : total}</span>
           <span className="stat-text">Toplam Hayvan</span>
         </div>
         <div className="profile-stat">
-          <span className="stat-number">{Math.round((owned / total) * 100)}%</span>
+          <span className="stat-number">{loading ? '—' : `${completion}%`}</span>
           <span className="stat-text">Tamamlanma</span>
         </div>
       </div>
