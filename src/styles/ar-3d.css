@@ -14,100 +14,22 @@
   box-shadow: 0 8px 28px rgba(0,0,0,.35);
   backdrop-filter: blur(10px);
 }
-
 .camera-3d-ar-button:disabled { opacity: .65; }
 .camera-3d-ar-button:active { transform: translateX(-50%) scale(.97); }
+.camera-3d-ar-active { position: absolute; top: 64px; left: 50%; transform: translateX(-50%); z-index: 30; padding: 8px 14px; border-radius: 999px; background: rgba(16,185,129,.88); color: #fff; font: 600 13px/1 system-ui, sans-serif; }
+.camera-sensor-mode { background: rgba(37,99,235,.88); }
 
-.camera-3d-ar-active {
-  position: absolute;
-  top: 64px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 30;
-  padding: 8px 14px;
-  border-radius: 999px;
-  background: rgba(16,185,129,.88);
-  color: #fff;
-  font: 600 13px/1 system-ui, sans-serif;
-}
+/* Mobile AR animal visibility: keep a guaranteed visible fallback behind WebGL. */
+.animal-3d-shell { position: relative; width: 150px; height: 150px; display: grid; place-items: center; overflow: visible; }
+.animal-3d-shell canvas { position: absolute; inset: 50% auto auto 50%; transform: translate(-50%, -50%); z-index: 2; pointer-events: none; }
+.animal-visual-fallback { position: absolute; inset: 0; display: grid; place-items: center; z-index: 1; font-size: 92px; line-height: 1; filter: drop-shadow(0 8px 12px rgba(0,0,0,.55)); transform: translateY(-2px); pointer-events: none; }
+.animal-3d-shell canvas + .animal-visual-fallback { z-index: 1; }
 
-.camera-sensor-mode {
-  background: rgba(37,99,235,.88);
-}
-
-.sensor-ar-fallback {
-  position: absolute;
-  inset: 0;
-  z-index: 12;
-  overflow: hidden;
-  pointer-events: none;
-  perspective: 900px;
-  perspective-origin: 50% 50%;
-}
-
-.sensor-ar-fallback-world {
-  position: absolute;
-  inset: 0;
-  transform-style: preserve-3d;
-  pointer-events: none;
-}
-
-.sensor-ar-animal {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 132px;
-  min-height: 110px;
-  padding: 4px;
-  border: 0;
-  background: transparent;
-  color: #fff;
-  transform-origin: center center;
-  transform-style: preserve-3d;
-  pointer-events: auto;
-  touch-action: manipulation;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  text-shadow: 0 1px 4px rgba(0,0,0,.9);
-}
-
-.sensor-ar-animal-model {
-  display: block;
-  filter: drop-shadow(0 8px 10px rgba(0,0,0,.42));
-}
-
-.sensor-ar-animal-label {
-  max-width: 128px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font: 700 14px/1.2 system-ui, sans-serif;
-}
-
-.sensor-ar-animal-distance {
-  font: 600 12px/1.2 system-ui, sans-serif;
-  opacity: .92;
-}
-
-.sensor-ar-reticle {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: 44px;
-  height: 44px;
-  border: 1px solid rgba(255,255,255,.72);
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  color: rgba(255,255,255,.9);
-  font: 300 24px/1 system-ui, sans-serif;
-  text-shadow: 0 1px 4px rgba(0,0,0,.8);
-  pointer-events: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .sensor-ar-animal-model { animation: none !important; }
-}
+.sensor-ar-fallback { position: absolute; inset: 0; z-index: 12; overflow: hidden; pointer-events: none; perspective: 900px; perspective-origin: 50% 50%; }
+.sensor-ar-fallback-world { position: absolute; inset: 0; transform-style: preserve-3d; pointer-events: none; }
+.sensor-ar-animal { position: absolute; left: 50%; top: 50%; width: 132px; min-height: 110px; padding: 4px; border: 0; background: transparent; color: #fff; transform-origin: center center; transform-style: preserve-3d; pointer-events: auto; touch-action: manipulation; display: flex; flex-direction: column; align-items: center; gap: 2px; text-shadow: 0 1px 4px rgba(0,0,0,.9); }
+.sensor-ar-animal-model { display: block; filter: drop-shadow(0 8px 10px rgba(0,0,0,.42)); }
+.sensor-ar-animal-label { max-width: 128px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 700 14px/1.2 system-ui, sans-serif; }
+.sensor-ar-animal-distance { font: 600 12px/1.2 system-ui, sans-serif; opacity: .92; }
+.sensor-ar-reticle { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 44px; height: 44px; border: 1px solid rgba(255,255,255,.72); border-radius: 50%; display: grid; place-items: center; color: rgba(255,255,255,.9); font: 300 24px/1 system-ui, sans-serif; text-shadow: 0 1px 4px rgba(0,0,0,.8); pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .sensor-ar-animal-model { animation: none !important; } }
