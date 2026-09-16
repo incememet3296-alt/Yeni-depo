@@ -23,16 +23,30 @@ export async function checkWebXRArSupport(): Promise<WebXRArSupport> {
   }
 }
 
-export async function startImmersiveAr(): Promise<XRSession | null> {
+export async function startImmersiveAr(overlayRoot?: HTMLElement): Promise<XRSession | null> {
   const support = await checkWebXRArSupport()
   if (!support.immersiveAr || !navigator.xr) return null
 
-  try {
-    return await navigator.xr.requestSession('immersive-ar', {
+  const attempts: XRSessionInit[] = [
+    {
       requiredFeatures: ['local-floor'],
       optionalFeatures: ['dom-overlay'],
-    })
-  } catch {
-    return null
+      ...(overlayRoot ? { domOverlay: { root: overlayRoot } } : {}),
+    },
+    {
+      requiredFeatures: [],
+      optionalFeatures: ['local-floor'],
+    },
+    { requiredFeatures: [] },
+  ]
+
+  for (const options of attempts) {
+    try {
+      return await navigator.xr.requestSession('immersive-ar', options)
+    } catch {
+      // Retry with fewer optional/required features for broader device support.
+    }
   }
+
+  return null
 }
