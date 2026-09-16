@@ -34,21 +34,38 @@ const mapAnimal = (row: {
   isOwned: row.is_owned,
 })
 
+const ANIMAL_FIELDS = 'id,name,species,description,image,latitude,longitude,altitude,rarity,level,is_owned'
+
+async function loadAnimalsWithPositions() {
+  if (!supabase) return null
+
+  const [animalsResult, positionsResult] = await Promise.all([
+    supabase.from('animals').select(ANIMAL_FIELDS).order('id'),
+    supabase.from('animal_positions').select('animal_id,latitude,longitude,altitude'),
+  ])
+
+  if (animalsResult.error || !animalsResult.data) {
+    console.warn('Supabase animals unavailable; using local fallback.', animalsResult.error?.message)
+    return null
+  }
+
+  const positions = new Map(
+    (positionsResult.data ?? []).map((position) => [position.animal_id, position]),
+  )
+
+  return animalsResult.data.map((row) => {
+    const animal = mapAnimal(row)
+    const position = positions.get(animal.id)
+    return position
+      ? { ...animal, latitude: position.latitude, longitude: position.longitude, altitude: position.altitude }
+      : animal
+  })
+}
+
 export const supabaseAnimalStore: AnimalStore = {
   async listAnimals() {
-    if (!supabase) return localAnimalStore.listAnimals()
-
-    const { data, error } = await supabase
-      .from('animals')
-      .select('id,name,species,description,image,latitude,longitude,altitude,rarity,level,is_owned')
-      .order('id')
-
-    if (error || !data) {
-      console.warn('Supabase animals unavailable; using local fallback.', error?.message)
-      return localAnimalStore.listAnimals()
-    }
-
-    return data.map(mapAnimal)
+    const animals = await loadAnimalsWithPositions()
+    return animals ?? localAnimalStore.listAnimals()
   },
 
   async getAnimal(id) {
@@ -56,7 +73,7 @@ export const supabaseAnimalStore: AnimalStore = {
 
     const { data, error } = await supabase
       .from('animals')
-      .select('id,name,species,description,image,latitude,longitude,altitude,rarity,level,is_owned')
+      .select(ANIMAL_FIELDS)
       .eq('id', id)
       .maybeSingle()
 
@@ -65,7 +82,18 @@ export const supabaseAnimalStore: AnimalStore = {
       return localAnimalStore.getAnimal(id)
     }
 
-    return data ? mapAnimal(data) : null
+    if (!data) return null
+
+    const { data: position } = await supabase
+      .from('animal_positions')
+      .select('latitude,longitude,altitude')
+      .eq('animal_id', id)
+      .maybeSingle()
+
+    const animal = mapAnimal(data)
+    return position
+      ? { ...animal, latitude: position.latitude, longitude: position.longitude, altitude: position.altitude }
+      : animal
   },
 }
 
