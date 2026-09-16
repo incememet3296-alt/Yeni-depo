@@ -28,12 +28,32 @@ const VERTICAL_FIELD_OF_VIEW = 45
 const HEADING_SMOOTHING = 0.18
 const LOCATION_SMOOTHING_MIN = 0.12
 const LOCATION_SMOOTHING_MAX = 0.45
+const TEST_ANIMAL_DISTANCE_METERS = [18, 28, 40, 55, 70]
+const TEST_ANIMAL_BEARINGS = [0, 72, 144, 216, 288]
 
 type WebXRSession = Awaited<ReturnType<typeof startWebXRAnimalSession>>
 interface CameraPageProps { onNavigate: (path: string) => void }
 
 function smoothCircularHeading(previous: number | null, current: number): number { if (previous == null) return normalizeHeading(current); const delta = ((current - previous + 540) % 360) - 180; return normalizeHeading(previous + delta * HEADING_SMOOTHING) }
 function smoothLocation(previous: LocationData | null, current: LocationData): LocationData { if (!previous) return current; const accuracyRatio = Math.min(Math.max(current.accuracy / 50, 0), 1); const alpha = LOCATION_SMOOTHING_MAX - accuracyRatio * (LOCATION_SMOOTHING_MAX - LOCATION_SMOOTHING_MIN); return { ...current, latitude: previous.latitude + (current.latitude - previous.latitude) * alpha, longitude: previous.longitude + (current.longitude - previous.longitude) * alpha, altitude: previous.altitude == null || current.altitude == null ? current.altitude : previous.altitude + (current.altitude - previous.altitude) * alpha } }
+
+function offsetCoordinate(latitude: number, longitude: number, distanceMeters: number, bearingDegrees: number) {
+  const earthRadius = 6371000
+  const bearing = bearingDegrees * Math.PI / 180
+  const lat = latitude * Math.PI / 180
+  const lon = longitude * Math.PI / 180
+  const angularDistance = distanceMeters / earthRadius
+  const targetLat = Math.asin(Math.sin(lat) * Math.cos(angularDistance) + Math.cos(lat) * Math.sin(angularDistance) * Math.cos(bearing))
+  const targetLon = lon + Math.atan2(Math.sin(bearing) * Math.sin(angularDistance) * Math.cos(lat), Math.cos(angularDistance) - Math.sin(lat) * Math.sin(targetLat))
+  return { latitude: targetLat * 180 / Math.PI, longitude: targetLon * 180 / Math.PI }
+}
+
+function buildLocalTestAnimals(animals: Animal[], location: LocationData): Animal[] {
+  return animals.slice(0, 5).map((animal, index) => {
+    const point = offsetCoordinate(location.latitude, location.longitude, TEST_ANIMAL_DISTANCE_METERS[index], TEST_ANIMAL_BEARINGS[index])
+    return { ...animal, latitude: point.latitude, longitude: point.longitude, altitude: (location.altitude ?? animal.altitude) + (index % 2 === 0 ? 2 : 5) }
+  })
+}
 
 export function CameraPage({ onNavigate }: CameraPageProps) {
   const camera = useCamera(); const location = useLocation(); const orientation = useOrientation(); const arSupport = useArSupport(); const { animals, loading: animalsLoading, error: animalsError } = useAnimals()
@@ -46,7 +66,13 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
   const rawHeading = useMemo(() => getHeading(orientation.data, filteredLocation?.heading), [orientation.data, filteredLocation?.heading])
   const heading = useMemo(() => { if (rawHeading == null) return null; const next = smoothCircularHeading(headingRef.current, rawHeading); headingRef.current = next; return next }, [rawHeading])
   const activeAnimals = useMemo(() => limitVisibleAnimals(animals, performanceProfile.maxAnimals), [animals, performanceProfile.maxAnimals])
-  const animalPositions = useMemo(() => { if (!filteredLocation || heading == null) return []; return activeAnimals.map((animal) => ({ animal, position: calculateAnimalPosition(animal, { latitude: filteredLocation.latitude, longitude: filteredLocation.longitude, accuracy: filteredLocation.accuracy, altitude: filteredLocation.altitude, heading }, heading) })) }, [activeAnimals, filteredLocation, heading])
+  const animalPositions = useMemo(() => {
+    if (!filteredLocation || heading == null) return []
+    const realPositions = activeAnimals.map((animal) => ({ animal, position: calculateAnimalPosition(animal, { latitude: filteredLocation.latitude, longitude: filteredLocation.longitude, accuracy: filteredLocation.accuracy, altitude: filteredLocation.altitude, heading }, heading) }))
+    if (realPositions.some((item) => item.position.visible)) return realPositions
+    const testAnimals = buildLocalTestAnimals(activeAnimals, filteredLocation)
+    return testAnimals.map((animal) => ({ animal, position: calculateAnimalPosition(animal, { latitude: filteredLocation.latitude, longitude: filteredLocation.longitude, accuracy: filteredLocation.accuracy, altitude: filteredLocation.altitude, heading }, heading) }))
+  }, [activeAnimals, filteredLocation, heading])
   const selectBestCenteredAnimal = () => { const candidates = animalPositions.filter((item) => item.position.visible); if (!candidates.length) return; const target = [...candidates].sort((a, b) => { const aa = Math.hypot(a.position.relativeBearing, a.position.verticalAngle); const ba = Math.hypot(b.position.relativeBearing, b.position.verticalAngle); if (Math.abs(aa - ba) > 4) return aa - ba; return a.position.distance - b.position.distance })[0]; setSelected(target.animal) }
   const start3DAr = async () => { if (!filteredLocation || heading == null || xrStarting || xrActive) return; setXrStarting(true); setXrUnavailable(false); try { const session = await startWebXRAnimalSession(activeAnimals, { ...filteredLocation, heading }, () => { xrSessionRef.current = null; setXrActive(false) }); if (!session) { setXrUnavailable(true); return } session.addEventListener('select', selectBestCenteredAnimal as EventListener); session.addEventListener('selectstart', selectBestCenteredAnimal as EventListener); xrSessionRef.current = session; setXrActive(true) } catch { setXrUnavailable(true) } finally { setXrStarting(false) } }
   const nearbyCount = animalPositions.filter((ap) => ap.position.visible).length; const arUnsupported = arSupport.status === 'unsupported'; const showFallback = arUnsupported
