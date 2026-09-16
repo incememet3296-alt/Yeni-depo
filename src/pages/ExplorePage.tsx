@@ -1,16 +1,17 @@
 import { useState } from 'react'
-import { ANIMALS } from '../data/animals'
 import { AnimalCard } from '../components/Animal/AnimalCard'
 import { AnimalInfo } from '../components/Animal/AnimalInfo'
+import { useAnimals } from '../hooks/useAnimals'
 import { useLocation } from '../hooks/useLocation'
 import { calculateDistance } from '../lib/distance'
 import type { Animal } from '../types/animal'
 
 export function ExplorePage() {
+  const { animals, loading, error } = useAnimals()
   const location = useLocation()
   const [selected, setSelected] = useState<Animal | null>(null)
 
-  const animalsWithDistance = ANIMALS.map((animal) => {
+  const animalsWithDistance = animals.map((animal) => {
     let distance: number | undefined
     if (location.data) {
       distance = calculateDistance(
@@ -45,18 +46,23 @@ export function ExplorePage() {
             Konum izni gerekli. Sanal hayvanları bulunduğun gerçek dünyadaki konumlarına göre gösterebilmek için konum erişimine izin ver.
           </div>
         )}
+        {error && <div className="location-warning">{error}</div>}
       </div>
 
-      <div className="explore-list">
-        {sorted.map(({ animal, distance }) => (
-          <AnimalCard
-            key={animal.id}
-            animal={animal}
-            distance={distance}
-            onClick={() => setSelected(animal)}
-          />
-        ))}
-      </div>
+      {loading ? (
+        <p>Hayvanlar yükleniyor…</p>
+      ) : (
+        <div className="explore-list">
+          {sorted.map(({ animal, distance }) => (
+            <AnimalCard
+              key={animal.id}
+              animal={animal}
+              distance={distance}
+              onClick={() => setSelected(animal)}
+            />
+          ))}
+        </div>
+      )}
 
       <AnimalInfo
         animal={selected}
