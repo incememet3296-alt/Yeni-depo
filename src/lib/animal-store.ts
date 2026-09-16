@@ -60,9 +60,14 @@ const mapAnimal = (row: AnimalRow): Animal => ({
 
 async function getCurrentUserId() {
   if (!supabase) return null
-  const { data, error } = await supabase.auth.getUser()
-  if (error) throw new Error('Oturum doğrulanamadı. Lütfen tekrar giriş yapın.')
+  const { data } = await supabase.auth.getUser()
   return data.user?.id ?? null
+}
+
+async function requireCurrentUserId() {
+  const userId = await getCurrentUserId()
+  if (!userId) throw new Error('Bu işlem için giriş yapmalısınız.')
+  return userId
 }
 
 async function getOwnedAnimalIds(): Promise<Set<string>> {
@@ -122,8 +127,7 @@ export const supabaseAnimalStore: AnimalStore = {
   },
   async purchaseAnimal(id) {
     if (!supabase) return localAnimalStore.purchaseAnimal(id)
-    const userId = await getCurrentUserId()
-    if (!userId) throw new Error('Hayvan satın almak için giriş yapmalısınız.')
+    const userId = await requireCurrentUserId()
     const { data: animalRow, error: animalError } = await supabase.from('animals').select(ANIMAL_FIELDS).eq('id', id).eq('is_for_sale', true).maybeSingle()
     if (animalError || !animalRow) throw new Error('Bu hayvan şu anda satışta değil.')
     const { data: existing } = await supabase.from('user_animals').select('animal_id').eq('user_id', userId).eq('animal_id', id).maybeSingle()
@@ -134,8 +138,7 @@ export const supabaseAnimalStore: AnimalStore = {
   },
   async setActiveAnimal(id) {
     if (!supabase) return
-    const userId = await getCurrentUserId()
-    if (!userId) throw new Error('Aktif hayvan seçmek için giriş yapmalısınız.')
+    const userId = await requireCurrentUserId()
     const { error: clearError } = await supabase.from('user_animals').update({ is_active: false }).eq('user_id', userId)
     if (clearError) throw new Error(`Aktif hayvan değiştirilemedi: ${clearError.message}`)
     const { error } = await supabase.from('user_animals').update({ is_active: true }).eq('user_id', userId).eq('animal_id', id)
