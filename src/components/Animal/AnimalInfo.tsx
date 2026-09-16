@@ -1,5 +1,6 @@
 import { Modal } from '../UI/Modal'
 import { Button } from '../UI/Button'
+import { Animal3D } from './Animal3D'
 import type { Animal } from '../../types/animal'
 
 interface AnimalInfoProps {
@@ -17,19 +18,13 @@ const RARITY_LABELS: Record<string, string> = {
   legendary: 'Efsanevi',
 }
 
-export function AnimalInfo({
-  animal,
-  distance,
-  onClose,
-  onApproach,
-  onInspect,
-}: AnimalInfoProps) {
+export function AnimalInfo({ animal, distance, onClose, onApproach, onInspect }: AnimalInfoProps) {
   return (
-    <Modal open={!!animal} onClose={onClose} ariaLabel="Hayvan bilgisi">
+    <Modal open={!!animal} onClose={onClose} ariaLabel="3B hayvan bilgisi">
       {animal && (
         <div className="animal-info">
-          <div className="animal-info-image">
-            <img src={animal.image} alt={animal.name} />
+          <div className="animal-info-image animal-info-3d">
+            <Animal3D rarity={animal.rarity} size={180} />
           </div>
           <h2>{animal.name}</h2>
           <p className="animal-info-species">{animal.species}</p>
@@ -41,9 +36,7 @@ export function AnimalInfo({
             </div>
             <div className="stat">
               <span className="stat-label">Nadirlik</span>
-              <span className={`stat-value rarity-${animal.rarity}`}>
-                {RARITY_LABELS[animal.rarity]}
-              </span>
+              <span className={`stat-value rarity-${animal.rarity}`}>{RARITY_LABELS[animal.rarity]}</span>
             </div>
             <div className="stat">
               <span className="stat-label">Seviye</span>
@@ -51,12 +44,8 @@ export function AnimalInfo({
             </div>
           </div>
           <div className="animal-info-actions">
-            {onApproach && (
-              <Button variant="secondary" onClick={onApproach}>Yaklaş</Button>
-            )}
-            {onInspect && (
-              <Button onClick={onInspect}>Hayvanı İncele</Button>
-            )}
+            {onApproach && <Button variant="secondary" onClick={onApproach}>Yaklaş</Button>}
+            {onInspect && <Button onClick={onInspect}>Hayvanı İncele</Button>}
           </div>
         </div>
       )}
