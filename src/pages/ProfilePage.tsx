@@ -1,17 +1,43 @@
+import type { User } from '@supabase/supabase-js'
 import { useAnimals } from '../hooks/useAnimals'
+import { supabase } from '../lib/supabase'
+import { Button } from '../components/UI/Button'
 
-export function ProfilePage() {
+interface ProfilePageProps {
+  user: User | null
+  onNavigate: (path: string) => void
+}
+
+export function ProfilePage({ user, onNavigate }: ProfilePageProps) {
   const { animals, loading } = useAnimals()
   const owned = animals.filter((animal) => animal.isOwned).length
   const total = animals.length
   const completion = total > 0 ? Math.round((owned / total) * 100) : 0
 
+  if (!user) {
+    return (
+      <div className="profile-page">
+        <div className="profile-header">
+          <div className="profile-avatar" aria-hidden="true">🐾</div>
+          <h1>Hesabınız</h1>
+          <p>Sanal hayvanınızı görmek ve yönetmek için giriş yapın.</p>
+        </div>
+        <Button onClick={() => onNavigate('/giris')}>Giriş Yap / Kayıt Ol</Button>
+      </div>
+    )
+  }
+
+  const signOut = async () => {
+    await supabase?.auth.signOut()
+    onNavigate('/')
+  }
+
   return (
     <div className="profile-page">
       <div className="profile-header">
         <div className="profile-avatar" aria-hidden="true">🐾</div>
-        <h1>Kaşif</h1>
-        <p>Sanal Hayvan Kaşifi</p>
+        <h1>Hesabım</h1>
+        <p>{user.email}</p>
       </div>
 
       <div className="profile-stats">
@@ -30,13 +56,11 @@ export function ProfilePage() {
       </div>
 
       <div className="profile-info">
-        <h2>Hakkında</h2>
-        <p>
-          Sanal Hayvan, gerçek dünyada sanal hayvanlar keşfetmeni sağlayan bir
-          artırılmış gerçeklik deneyimidir. Telefonunun kamerasını aç, çevreni
-          keşfet ve hayvanları bul!
-        </p>
+        <h2>Hesap</h2>
+        <p>Bu hesap, satın aldığınız sanal hayvanı sizinle eşleştirmek için kullanılır.</p>
       </div>
+
+      <Button variant="ghost" onClick={signOut}>Çıkış Yap</Button>
     </div>
   )
 }
