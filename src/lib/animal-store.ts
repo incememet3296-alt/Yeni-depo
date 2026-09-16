@@ -1,21 +1,12 @@
 import { ANIMALS } from '../data/animals'
 import type { Animal } from '../types/animal'
+import { supabase } from './supabase'
 
-/**
- * Virtual Animal data boundary.
- *
- * IMPORTANT: this module intentionally has no dependency on MySkyParcel,
- * its Supabase project, or its environment variables.
- * A separate Supabase project can implement this interface later.
- */
 export interface AnimalStore {
   listAnimals(): Promise<Animal[]>
   getAnimal(id: string): Promise<Animal | null>
 }
 
-/** Local provider keeps the app fully functional until the dedicated
- * Virtual Animal Supabase project is provisioned.
- */
 export const localAnimalStore: AnimalStore = {
   async listAnimals() {
     return ANIMALS
@@ -25,10 +16,59 @@ export const localAnimalStore: AnimalStore = {
   },
 }
 
-/**
- * Explicit provider factory. The remote provider is deliberately not
- * implemented until a NEW, dedicated Supabase URL/key is supplied.
- */
+const mapAnimal = (row: {
+  id: string
+  name: string
+  species: string
+  description: string
+  image: string
+  latitude: number
+  longitude: number
+  altitude: number
+  rarity: string
+  level: number
+  is_owned: boolean
+}): Animal => ({
+  ...row,
+  rarity: row.rarity as Animal['rarity'],
+  isOwned: row.is_owned,
+})
+
+export const supabaseAnimalStore: AnimalStore = {
+  async listAnimals() {
+    if (!supabase) return localAnimalStore.listAnimals()
+
+    const { data, error } = await supabase
+      .from('animals')
+      .select('id,name,species,description,image,latitude,longitude,altitude,rarity,level,is_owned')
+      .order('id')
+
+    if (error || !data) {
+      console.warn('Supabase animals unavailable; using local fallback.', error?.message)
+      return localAnimalStore.listAnimals()
+    }
+
+    return data.map(mapAnimal)
+  },
+
+  async getAnimal(id) {
+    if (!supabase) return localAnimalStore.getAnimal(id)
+
+    const { data, error } = await supabase
+      .from('animals')
+      .select('id,name,species,description,image,latitude,longitude,altitude,rarity,level,is_owned')
+      .eq('id', id)
+      .maybeSingle()
+
+    if (error) {
+      console.warn('Supabase animal lookup failed; using local fallback.', error.message)
+      return localAnimalStore.getAnimal(id)
+    }
+
+    return data ? mapAnimal(data) : null
+  },
+}
+
 export function getAnimalStore(): AnimalStore {
-  return localAnimalStore
+  return supabase ? supabaseAnimalStore : localAnimalStore
 }

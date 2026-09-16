@@ -1,13 +1,13 @@
 import { useState } from 'react'
-import { ANIMALS } from '../data/animals'
 import { AnimalCard } from '../components/Animal/AnimalCard'
 import { AnimalInfo } from '../components/Animal/AnimalInfo'
+import { useAnimals } from '../hooks/useAnimals'
 import type { Animal } from '../types/animal'
 
 export function AnimalsPage() {
+  const { animals, loading, error } = useAnimals()
   const [selected, setSelected] = useState<Animal | null>(null)
-  const owned = ANIMALS.filter((a) => a.isOwned)
-  const discovered = ANIMALS
+  const owned = animals.filter((animal) => animal.isOwned)
 
   return (
     <div className="animals-page">
@@ -22,21 +22,28 @@ export function AnimalsPage() {
           <span className="stat-text">Sahiplenilen</span>
         </div>
         <div className="stat-pill">
-          <span className="stat-number">{discovered.length}</span>
+          <span className="stat-number">{animals.length}</span>
           <span className="stat-text">Keşfedilen</span>
         </div>
       </div>
 
-      <h2 className="section-title">Tüm Hayvanlar</h2>
-      <div className="animals-grid">
-        {ANIMALS.map((animal) => (
-          <AnimalCard
-            key={animal.id}
-            animal={animal}
-            onClick={() => setSelected(animal)}
-          />
-        ))}
-      </div>
+      {error && <p className="status-message warning">{error}</p>}
+      {loading ? (
+        <p>Hayvanlar yükleniyor…</p>
+      ) : (
+        <>
+          <h2 className="section-title">Tüm Hayvanlar</h2>
+          <div className="animals-grid">
+            {animals.map((animal) => (
+              <AnimalCard
+                key={animal.id}
+                animal={animal}
+                onClick={() => setSelected(animal)}
+              />
+            ))}
+          </div>
+        </>
+      )}
 
       <AnimalInfo
         animal={selected}
