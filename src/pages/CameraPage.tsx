@@ -41,107 +41,46 @@ function smoothLocation(previous: LocationData | null, current: LocationData): L
   if (!previous) return current
   const accuracyRatio = Math.min(Math.max(current.accuracy / 50, 0), 1)
   const alpha = LOCATION_SMOOTHING_MAX - accuracyRatio * (LOCATION_SMOOTHING_MAX - LOCATION_SMOOTHING_MIN)
-  return {
-    ...current,
-    latitude: previous.latitude + (current.latitude - previous.latitude) * alpha,
-    longitude: previous.longitude + (current.longitude - previous.longitude) * alpha,
-    altitude: previous.altitude == null || current.altitude == null ? current.altitude : previous.altitude + (current.altitude - previous.altitude) * alpha,
-  }
+  return { ...current, latitude: previous.latitude + (current.latitude - previous.latitude) * alpha, longitude: previous.longitude + (current.longitude - previous.longitude) * alpha, altitude: previous.altitude == null || current.altitude == null ? current.altitude : previous.altitude + (current.altitude - previous.altitude) * alpha }
 }
 
 export function CameraPage({ onNavigate }: CameraPageProps) {
-  const camera = useCamera()
-  const location = useLocation()
-  const orientation = useOrientation()
-  const arSupport = useArSupport()
-  const { animals, loading: animalsLoading, error: animalsError } = useAnimals(true)
-  const [selected, setSelected] = useState<Animal | null>(null)
-  const [viewport, setViewport] = useState({ width: window.innerWidth, height: window.innerHeight })
-  const [xrStarting, setXrStarting] = useState(false)
-  const [xrActive, setXrActive] = useState(false)
-  const [xrUnavailable, setXrUnavailable] = useState(false)
-  const xrSessionRef = useRef<WebXRSession>(null)
-  const headingRef = useRef<number | null>(null)
-  const locationRef = useRef<LocationData | null>(null)
-  const performanceProfile = useMemo(() => getArPerformanceProfile(), [])
+  const camera = useCamera(); const location = useLocation(); const orientation = useOrientation(); const arSupport = useArSupport(); const { animals, loading: animalsLoading, error: animalsError } = useAnimals(true)
+  const [selected, setSelected] = useState<Animal | null>(null); const [viewport, setViewport] = useState({ width: window.innerWidth, height: window.innerHeight }); const [xrStarting, setXrStarting] = useState(false); const [xrActive, setXrActive] = useState(false); const [xrUnavailable, setXrUnavailable] = useState(false)
+  const xrSessionRef = useRef<WebXRSession>(null); const headingRef = useRef<number | null>(null); const locationRef = useRef<LocationData | null>(null)
+  useMemo(() => getArPerformanceProfile(), [])
 
-  useEffect(() => {
-    const onResize = () => setViewport({ width: window.innerWidth, height: window.innerHeight })
-    window.addEventListener('resize', onResize)
-    window.addEventListener('orientationchange', onResize)
-    return () => { window.removeEventListener('resize', onResize); window.removeEventListener('orientationchange', onResize) }
-  }, [])
-
+  useEffect(() => { const onResize = () => setViewport({ width: window.innerWidth, height: window.innerHeight }); window.addEventListener('resize', onResize); window.addEventListener('orientationchange', onResize); return () => { window.removeEventListener('resize', onResize); window.removeEventListener('orientationchange', onResize) } }, [])
   useEffect(() => () => { void xrSessionRef.current?.end(); xrSessionRef.current = null }, [])
 
-  const filteredLocation = useMemo(() => {
-    if (!location.data) return null
-    const next = smoothLocation(locationRef.current, location.data)
-    locationRef.current = next
-    return next
-  }, [location.data])
-
+  const filteredLocation = useMemo(() => { if (!location.data) return null; const next = smoothLocation(locationRef.current, location.data); locationRef.current = next; return next }, [location.data])
   const rawHeading = useMemo(() => getHeading(orientation.data, filteredLocation?.heading), [orientation.data, filteredLocation?.heading])
-  const heading = useMemo(() => {
-    const next = smoothCircularHeading(headingRef.current, rawHeading ?? 0)
-    headingRef.current = next
-    return next
-  }, [rawHeading])
-
+  const heading = useMemo(() => { const next = smoothCircularHeading(headingRef.current, rawHeading ?? 0); headingRef.current = next; return next }, [rawHeading])
   const pet = animals[0] ?? null
-  const petForWorld = useMemo(() => {
-    if (!pet || !filteredLocation) return null
-    const followed = getFollowingPetLocation({ ...filteredLocation, heading }, pet, heading)
-    return { ...pet, ...followed }
-  }, [pet, filteredLocation, heading])
-
-  const animalPositions = useMemo(() => {
-    if (!pet || !filteredLocation || !petForWorld) return []
-    return [{
-      animal: pet,
-      position: calculateAnimalPosition(pet, { ...filteredLocation, heading }, heading),
-    }]
-  }, [pet, petForWorld, filteredLocation, heading])
-
-  const selectPet = () => setSelected(pet)
+  const petForWorld = useMemo(() => { if (!pet || !filteredLocation) return null; return { ...pet, ...getFollowingPetLocation({ ...filteredLocation, heading }, pet, heading) } }, [pet, filteredLocation, heading])
+  const animalPositions = useMemo(() => { if (!pet || !filteredLocation) return []; return [{ animal: pet, position: calculateAnimalPosition(pet, { ...filteredLocation, heading }, heading) }] }, [pet, filteredLocation, heading])
 
   const start3DAr = async () => {
     if (!petForWorld || !filteredLocation || xrStarting || xrActive) return
-    setXrStarting(true)
-    setXrUnavailable(false)
+    setXrStarting(true); setXrUnavailable(false)
     try {
-      const session = await startWebXRAnimalSession([petForWorld], { ...filteredLocation, heading }, () => {
-        xrSessionRef.current = null
-        setXrActive(false)
-      })
+      const session = await startWebXRAnimalSession([petForWorld], { ...filteredLocation, heading }, () => { xrSessionRef.current = null; setXrActive(false) }, undefined, () => ({ ...(locationRef.current ?? filteredLocation), heading: headingRef.current ?? heading }))
       if (!session) { setXrUnavailable(true); return }
-      session.addEventListener('select', selectPet as EventListener)
-      session.addEventListener('selectstart', selectPet as EventListener)
-      xrSessionRef.current = session
-      setXrActive(true)
-    } catch {
-      setXrUnavailable(true)
-    } finally {
-      setXrStarting(false)
-    }
+      session.addEventListener('select', () => { setSelected(pet) })
+      session.addEventListener('selectstart', () => { setSelected(pet) })
+      xrSessionRef.current = session; setXrActive(true)
+    } catch { setXrUnavailable(true) } finally { setXrStarting(false) }
   }
 
-  const arUnsupported = arSupport.status === 'unsupported'
-  const showFallback = arUnsupported || xrUnavailable
-
-  if (showFallback && !camera.state.stream) {
-    return <div className="camera-page"><Header title="Benim Hayvanım" showBack onBack={() => onNavigate('/')} /><div className="fallback-mode">
-      <div className="fallback-icon" aria-hidden="true">🐾</div>
-      {!pet ? <><StatusMessage type="info" title="Henüz sanal hayvanınız yok" message="Önce mağazadan kendi hayvanınızı satın alın." /><Button onClick={() => onNavigate('/animals')}>🐾 Hayvan Satın Al</Button></> : <><StatusMessage type="info" title={`${pet.name} sizinle`} message="Hayvanınız telefonunuzun canlı konumuna göre yanınızda tutulur." /><Animal3D rarity={pet.rarity} size={120} /><Button onClick={() => void camera.start()}>📷 Kamerayı Aç</Button></>}
-    </div></div>
-  }
+  const showFallback = arSupport.status === 'unsupported' || xrUnavailable
+  if (showFallback && !camera.state.stream) return <div className="camera-page"><Header title="Benim Hayvanım" showBack onBack={() => onNavigate('/')} /><div className="fallback-mode"><div className="fallback-icon" aria-hidden="true">🐾</div>{!pet ? <><StatusMessage type="info" title="Henüz sanal hayvanınız yok" message="Önce mağazadan kendi hayvanınızı satın alın." /><Button onClick={() => onNavigate('/animals')}>🐾 Hayvan Satın Al</Button></> : <><StatusMessage type="info" title={`${pet.name} sizinle`} message="Hayvanınız telefonunuzun canlı konumuna göre yanınızda tutulur." /><Animal3D rarity={pet.rarity} size={120} /><Button onClick={() => void camera.start()}>📷 Kamerayı Aç</Button></>}</div></div>
 
   return <div className="camera-page">
     <div className="camera-top-bar"><button className="camera-back" onClick={() => onNavigate('/')} aria-label="Geri">←</button><div className="gps-info"><span>{filteredLocation ? `📍 ±${Math.round(filteredLocation.accuracy)}m` : '📍 Konum bekleniyor...'}</span></div><CameraStatus state={camera.state} /></div>
     <div className="camera-stage">
       {camera.state.status === 'ready' ? <>
         <CameraView state={camera.state} />
-        {!pet ? <div className="ar-overlay" style={{ display: 'grid', placeItems: 'center', padding: 24 }}><div style={{ textAlign: 'center', background: 'rgba(0,0,0,.7)', borderRadius: 18, padding: 20 }}><div style={{ fontSize: 56 }}>🐾</div><strong>Önce kendi hayvanınızı satın alın</strong><p>Bu kamera yalnızca size ait sanal hayvanı gösterir.</p><Button onClick={() => onNavigate('/animals')}>Hayvan Mağazasına Git</Button></div></div> : showFallback ? <SensorArFallback items={animalPositions} screenWidth={viewport.width} screenHeight={viewport.height} fieldOfView={FIELD_OF_VIEW} verticalFieldOfView={VERTICAL_FIELD_OF_VIEW} onSelect={setSelected} /> : <div className="ar-overlay">{animalPositions.map((ap) => <AnimalMarker key={ap.animal.id} animal={ap.animal} position={ap.position} screenWidth={viewport.width} screenHeight={viewport.height} fieldOfView={FIELD_OF_VIEW} verticalFieldOfView={VERTICAL_FIELD_OF_VIEW} onSelect={selectPet} />)}</div>}
+        {!pet ? <div className="ar-overlay" style={{ display: 'grid', placeItems: 'center', padding: 24 }}><div style={{ textAlign: 'center', background: 'rgba(0,0,0,.72)', borderRadius: 18, padding: 20 }}><div style={{ fontSize: 56 }}>🐾</div><strong>Önce kendi sanal hayvanınızı satın alın</strong><p>Bu kamera yalnızca size ait hayvanı gösterir.</p><Button onClick={() => onNavigate('/animals')}>Hayvan Mağazasına Git</Button></div></div> : showFallback ? <SensorArFallback items={animalPositions} screenWidth={viewport.width} screenHeight={viewport.height} fieldOfView={FIELD_OF_VIEW} verticalFieldOfView={VERTICAL_FIELD_OF_VIEW} onSelect={setSelected} /> : <div className="ar-overlay">{animalPositions.map((ap) => <AnimalMarker key={ap.animal.id} animal={ap.animal} position={ap.position} screenWidth={viewport.width} screenHeight={viewport.height} fieldOfView={FIELD_OF_VIEW} verticalFieldOfView={VERTICAL_FIELD_OF_VIEW} onSelect={() => setSelected(ap.animal)} />)}</div>}
         {pet && arSupport.hasImmersiveAr && !xrActive && !xrUnavailable && <button className="camera-3d-ar-button" onClick={() => void start3DAr()} disabled={xrStarting || !filteredLocation || animalsLoading}>{xrStarting ? '3D AR başlatılıyor…' : '🥽 Gerçek 3D AR'}</button>}
         {xrActive && <div className="camera-3d-ar-active" role="status">🥽 3D AR aktif — {pet?.name} yanınızda</div>}
       </> : <CameraPermission onRequest={camera.start} />}
