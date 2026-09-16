@@ -16,6 +16,9 @@ export interface Database {
           rarity: string
           level: number
           is_owned: boolean
+          price_tl: number
+          is_for_sale: boolean
+          follow_distance_m: number
           created_at: string
           updated_at: string
         }
@@ -33,8 +36,8 @@ export interface Database {
         Relationships: []
       }
       user_animals: {
-        Row: { user_id: string; animal_id: string; created_at: string }
-        Insert: { user_id: string; animal_id: string; created_at?: string }
+        Row: { user_id: string; animal_id: string; created_at: string; purchased_at: string; is_active: boolean }
+        Insert: { user_id: string; animal_id: string; created_at?: string; purchased_at?: string; is_active?: boolean }
         Update: Partial<Database['public']['Tables']['user_animals']['Insert']>
         Relationships: []
       }
