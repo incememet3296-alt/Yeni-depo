@@ -12,14 +12,6 @@ interface AnimalMarkerProps {
   onSelect: () => void
 }
 
-const ANIMAL_ICONS: Record<string, string> = {
-  'cat-01': '🐱',
-  'dog-01': '🐶',
-  'rabbit-01': '🐰',
-  'fox-01': '🦊',
-  'bird-01': '🐦',
-}
-
 export function AnimalMarker({
   animal,
   position,
@@ -35,7 +27,6 @@ export function AnimalMarker({
   const offsetY = getVerticalScreenOffset(position.verticalAngle, verticalFieldOfView, screenHeight)
   const scale = Math.max(getDistanceScale(position.distance, DISCOVERY_RADIUS), 0.9)
   const modelSize = Math.max(96, Math.min(150, 108 * scale))
-  const icon = ANIMAL_ICONS[animal.id] ?? '🐾'
 
   return (
     <div
@@ -53,23 +44,6 @@ export function AnimalMarker({
       aria-label={`${animal.name}, ${Math.round(position.distance)} metre`}
     >
       <div className="animal-3d-shell" aria-hidden="true">
-        <div
-          className="animal-visual-fallback"
-          aria-hidden="true"
-          style={{
-            position: 'absolute',
-            inset: 0,
-            zIndex: 10,
-            display: 'grid',
-            placeItems: 'center',
-            fontSize: '96px',
-            lineHeight: 1,
-            opacity: 1,
-            visibility: 'visible',
-          }}
-        >
-          {icon}
-        </div>
         <Animal3D rarity={animal.rarity} size={modelSize} />
       </div>
       <div className="marker-label">{animal.name}</div>
