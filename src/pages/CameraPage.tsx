@@ -12,11 +12,11 @@ import { useCamera } from '../hooks/useCamera'
 import { useLocation } from '../hooks/useLocation'
 import { useOrientation } from '../hooks/useOrientation'
 import { useArSupport } from '../hooks/useArSupport'
+import { useAnimals } from '../hooks/useAnimals'
 import { getHeading, normalizeHeading } from '../lib/compass'
 import { calculateAnimalPosition } from '../lib/animal-position'
 import { calculateDistance } from '../lib/distance'
 import { startWebXRAnimalSession } from '../lib/webxr-ar'
-import { ANIMALS } from '../data/animals'
 import type { Animal } from '../types/animal'
 import type { LocationData } from '../lib/location'
 import '../styles/ar-3d.css'
@@ -60,6 +60,7 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
   const location = useLocation()
   const orientation = useOrientation()
   const arSupport = useArSupport()
+  const { animals, loading: animalsLoading, error: animalsError } = useAnimals()
   const [selected, setSelected] = useState<Animal | null>(null)
   const [viewport, setViewport] = useState({ width: window.innerWidth, height: window.innerHeight })
   const [fallbackMode, setFallbackMode] = useState(false)
@@ -109,7 +110,7 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
   const animalPositions = useMemo(() => {
     const currentLocation = filteredLocation
     if (!currentLocation || heading == null) return []
-    return ANIMALS.map((animal) => ({
+    return animals.map((animal) => ({
       animal,
       position: calculateAnimalPosition(animal, {
         latitude: currentLocation.latitude,
@@ -119,14 +120,14 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
         heading,
       }, heading),
     }))
-  }, [filteredLocation, heading])
+  }, [animals, filteredLocation, heading])
 
   const start3DAr = async () => {
     if (!filteredLocation || heading == null || xrStarting || xrActive) return
     setXrStarting(true)
     setXrUnavailable(false)
     try {
-      const session = await startWebXRAnimalSession(ANIMALS, { ...filteredLocation, heading }, () => {
+      const session = await startWebXRAnimalSession(animals, { ...filteredLocation, heading }, () => {
         xrSessionRef.current = null
         setXrActive(false)
       })
@@ -202,7 +203,7 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
               </div>
             )}
             {arSupport.hasImmersiveAr && !xrActive && !xrUnavailable && (
-              <button className="camera-3d-ar-button" onClick={() => void start3DAr()} disabled={xrStarting || !filteredLocation || heading == null}>
+              <button className="camera-3d-ar-button" onClick={() => void start3DAr()} disabled={xrStarting || !filteredLocation || heading == null || animalsLoading}>
                 {xrStarting ? '3D AR başlatılıyor…' : '🥽 Gerçek 3D AR'}
               </button>
             )}
@@ -213,10 +214,7 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
           <CameraPermission onRequest={camera.start} />
         )}
 
-        {camera.state.status === 'permission-denied' && <StatusMessage type="error" title="Kamera İzni Reddedildi" message="Tarayıcı ayarlarından kamera iznini verin ve tekrar deneyin." action={{ label: 'Tekrar Dene', onClick: camera.start }} />}
-        {camera.state.status === 'https-required' && <StatusMessage type="warning" title="HTTPS Gerekli" message="Kamera API'si için HTTPS bağlantısı zorunludur." />}
-        {camera.state.status === 'unsupported' && <StatusMessage type="error" title="Kamera Desteklenmiyor" message="Bu cihaz veya tarayıcı kamera API desteklemiyor." action={{ label: 'Keşif Modunu Aç', onClick: () => setFallbackMode(true) }} />}
-        {camera.state.status === 'error' && <StatusMessage type="error" title="Kamera Kullanılamıyor" message={camera.state.error || 'Bilinmeyen hata.'} action={{ label: 'Tekrar Dene', onClick: camera.start }} />}
+        {animalsError && <StatusMessage type="warning" title="Hayvan verileri" message={animalsError} />}
         {orientation.status === 'permission-required' && <StatusMessage type="warning" title="Pusula İzni Gerekli" message="Hayvanların yönünü doğru göstermek için sensör izni gerekiyor." action={{ label: 'İzin İste', onClick: () => orientation.requestPermission() }} />}
         {orientation.status === 'permission-denied' && <StatusMessage type="warning" title="Pusula İzni Reddedildi" message="Yön sensörü izni olmadan GPS tabanlı keşif devam eder." />}
         {location.status === 'permission-denied' && <StatusMessage type="warning" title="Konum İzni Gerekli" message="Sanal hayvanları gerçek dünyadaki konumlarına göre göstermek için konum erişimine izin ver." />}
