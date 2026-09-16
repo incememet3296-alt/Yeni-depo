@@ -36,12 +36,33 @@ const mapAnimal = (row: {
 
 const ANIMAL_FIELDS = 'id,name,species,description,image,latitude,longitude,altitude,rarity,level,is_owned'
 
+async function getOwnedAnimalIds(): Promise<Set<string>> {
+  if (!supabase) return new Set()
+
+  const { data: userResult } = await supabase.auth.getUser()
+  const userId = userResult.user?.id
+  if (!userId) return new Set()
+
+  const { data, error } = await supabase
+    .from('user_animals')
+    .select('animal_id')
+    .eq('user_id', userId)
+
+  if (error) {
+    console.warn('Supabase ownership unavailable; using animal defaults.', error.message)
+    return new Set()
+  }
+
+  return new Set((data ?? []).map((row) => row.animal_id))
+}
+
 async function loadAnimalsWithPositions() {
   if (!supabase) return null
 
-  const [animalsResult, positionsResult] = await Promise.all([
+  const [animalsResult, positionsResult, ownedIds] = await Promise.all([
     supabase.from('animals').select(ANIMAL_FIELDS).order('id'),
     supabase.from('animal_positions').select('animal_id,latitude,longitude,altitude'),
+    getOwnedAnimalIds(),
   ])
 
   if (animalsResult.error || !animalsResult.data) {
@@ -56,9 +77,13 @@ async function loadAnimalsWithPositions() {
   return animalsResult.data.map((row) => {
     const animal = mapAnimal(row)
     const position = positions.get(animal.id)
-    return position
-      ? { ...animal, latitude: position.latitude, longitude: position.longitude, altitude: position.altitude }
-      : animal
+    return {
+      ...animal,
+      isOwned: ownedIds.has(animal.id),
+      ...(position
+        ? { latitude: position.latitude, longitude: position.longitude, altitude: position.altitude }
+        : {}),
+    }
   })
 }
 
@@ -84,16 +109,23 @@ export const supabaseAnimalStore: AnimalStore = {
 
     if (!data) return null
 
-    const { data: position } = await supabase
-      .from('animal_positions')
-      .select('latitude,longitude,altitude')
-      .eq('animal_id', id)
-      .maybeSingle()
+    const [{ data: position }, ownedIds] = await Promise.all([
+      supabase
+        .from('animal_positions')
+        .select('latitude,longitude,altitude')
+        .eq('animal_id', id)
+        .maybeSingle(),
+      getOwnedAnimalIds(),
+    ])
 
     const animal = mapAnimal(data)
-    return position
-      ? { ...animal, latitude: position.latitude, longitude: position.longitude, altitude: position.altitude }
-      : animal
+    return {
+      ...animal,
+      isOwned: ownedIds.has(id),
+      ...(position
+        ? { latitude: position.latitude, longitude: position.longitude, altitude: position.altitude }
+        : {}),
+    }
   },
 }
 
