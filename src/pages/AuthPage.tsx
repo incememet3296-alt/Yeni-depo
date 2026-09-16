@@ -1,4 +1,5 @@
-import { FormEvent, useState } from 'react'
+import { useState } from 'react'
+import type { FormEvent } from 'react'
 import { Button } from '../components/UI/Button'
 import { supabase } from '../lib/supabase'
 
@@ -14,8 +15,7 @@ export function AuthPage({ onNavigate }: AuthPageProps) {
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     if (!supabase) { setMessage('Supabase bağlantısı yapılandırılmamış.'); return }
-    setBusy(true)
-    setMessage(null)
+    setBusy(true); setMessage(null)
     try {
       if (register) {
         const { data, error } = await supabase.auth.signUp({ email: email.trim(), password })
@@ -28,9 +28,7 @@ export function AuthPage({ onNavigate }: AuthPageProps) {
       }
     } catch (reason: unknown) {
       setMessage(reason instanceof Error ? reason.message : 'Kimlik doğrulama başarısız.')
-    } finally {
-      setBusy(false)
-    }
+    } finally { setBusy(false) }
   }
 
   return <div className="profile-page">
