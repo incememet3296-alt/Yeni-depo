@@ -63,7 +63,6 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
   const { animals, loading: animalsLoading, error: animalsError } = useAnimals()
   const [selected, setSelected] = useState<Animal | null>(null)
   const [viewport, setViewport] = useState({ width: window.innerWidth, height: window.innerHeight })
-  const [fallbackMode, setFallbackMode] = useState(false)
   const [xrStarting, setXrStarting] = useState(false)
   const [xrActive, setXrActive] = useState(false)
   const [xrUnavailable, setXrUnavailable] = useState(false)
@@ -146,7 +145,7 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
 
   const nearbyCount = animalPositions.filter((ap) => ap.position.visible).length
   const arUnsupported = arSupport.status === 'unsupported'
-  const showFallback = fallbackMode || arUnsupported
+  const showFallback = arUnsupported
 
   if (showFallback && !camera.state.stream) {
     return (
