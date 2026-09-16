@@ -47,7 +47,7 @@ function smoothLocation(previous: LocationData | null, current: LocationData): L
 export function CameraPage({ onNavigate }: CameraPageProps) {
   const camera = useCamera(); const location = useLocation(); const orientation = useOrientation(); const arSupport = useArSupport(); const { animals, loading: animalsLoading, error: animalsError } = useAnimals(true)
   const [selected, setSelected] = useState<Animal | null>(null); const [viewport, setViewport] = useState({ width: window.innerWidth, height: window.innerHeight }); const [xrStarting, setXrStarting] = useState(false); const [xrActive, setXrActive] = useState(false); const [xrUnavailable, setXrUnavailable] = useState(false)
-  const xrSessionRef = useRef<WebXRSession>(null); const headingRef = useRef<number | null>(null); const locationRef = useRef<LocationData | null>(null)
+  const xrSessionRef = useRef<WebXRSession>(null); const headingRef = useRef<number | null>(null); const locationRef = useRef<LocationData | null>(null); const petAnchorHeadingRef = useRef<number | null>(null); const petAnchorIdRef = useRef<string | null>(null)
   useMemo(() => getArPerformanceProfile(), [])
 
   useEffect(() => { const onResize = () => setViewport({ width: window.innerWidth, height: window.innerHeight }); window.addEventListener('resize', onResize); window.addEventListener('orientationchange', onResize); return () => { window.removeEventListener('resize', onResize); window.removeEventListener('orientationchange', onResize) } }, [])
@@ -57,8 +57,22 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
   const rawHeading = useMemo(() => getHeading(orientation.data, filteredLocation?.heading), [orientation.data, filteredLocation?.heading])
   const heading = useMemo(() => { const next = smoothCircularHeading(headingRef.current, rawHeading ?? 0); headingRef.current = next; return next }, [rawHeading])
   const pet = animals[0] ?? null
-  const petForWorld = useMemo(() => { if (!pet || !filteredLocation) return null; return { ...pet, ...getFollowingPetLocation({ ...filteredLocation, heading }, pet, heading) } }, [pet, filteredLocation, heading])
-  const animalPositions = useMemo(() => { if (!pet || !filteredLocation) return []; return [{ animal: pet, position: calculateAnimalPosition(pet, { ...filteredLocation, heading }, heading) }] }, [pet, filteredLocation, heading])
+
+  useEffect(() => {
+    if (!pet) {
+      petAnchorIdRef.current = null
+      petAnchorHeadingRef.current = null
+      return
+    }
+    if (petAnchorIdRef.current !== pet.id) {
+      petAnchorIdRef.current = pet.id
+      petAnchorHeadingRef.current = heading
+    }
+  }, [pet?.id, heading])
+
+  const petAnchorHeading = petAnchorHeadingRef.current ?? heading
+  const petForWorld = useMemo(() => { if (!pet || !filteredLocation) return null; return { ...pet, ...getFollowingPetLocation({ ...filteredLocation, heading }, pet, petAnchorHeading) } }, [pet, filteredLocation, heading, petAnchorHeading])
+  const animalPositions = useMemo(() => { if (!pet || !filteredLocation) return []; return [{ animal: pet, position: calculateAnimalPosition(pet, { ...filteredLocation, heading }, heading, petAnchorHeading) }] }, [pet, filteredLocation, heading, petAnchorHeading])
 
   const start3DAr = async () => {
     if (!petForWorld || !filteredLocation || xrStarting || xrActive) return
@@ -89,6 +103,6 @@ export function CameraPage({ onNavigate }: CameraPageProps) {
       {filteredLocation && filteredLocation.accuracy > 100 && <StatusMessage type="info" title="GPS Doğruluğu Düşük" message={`GPS doğruluğu ±${Math.round(filteredLocation.accuracy)}m. Daha iyi sonuç için açık alana çıkın.`} />}
     </div>
     <div className="camera-bottom-bar"><div className="nearby-count"><span className="count-icon" aria-hidden="true">🐾</span><span>{pet ? `${pet.name} yanınızda` : 'Hayvanınız yok'}</span></div><button className="camera-nav-btn" onClick={() => onNavigate('/animals')}>🐾 Hayvanlarım</button></div>
-    <AnimalInfo animal={selected} distance={selected && filteredLocation ? calculateAnimalPosition(selected, { ...filteredLocation, heading }, heading).distance : undefined} onClose={() => setSelected(null)} onApproach={() => setSelected(null)} onInspect={() => { setSelected(null); onNavigate('/animals') }} />
+    <AnimalInfo animal={selected} distance={selected && filteredLocation ? calculateAnimalPosition(selected, { ...filteredLocation, heading }, heading, petAnchorHeading).distance : undefined} onClose={() => setSelected(null)} onApproach={() => setSelected(null)} onInspect={() => { setSelected(null); onNavigate('/animals') }} />
   </div>
 }
