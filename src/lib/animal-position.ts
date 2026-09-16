@@ -1,7 +1,9 @@
 import type { Animal, AnimalPosition, UserLocation } from '../types/animal'
 import { toLocalWorldPosition } from './world-position'
 
-export const DISCOVERY_RADIUS = 1000
+// Keep distant animals discoverable on the camera screen. The true 3D WebXR
+// renderer still applies its own 1 km world-space limit.
+export const DISCOVERY_RADIUS = 10000
 
 export function calculateAnimalPosition(
   animal: Animal,
