@@ -28,10 +28,8 @@ function matrixMultiply(a: Float32Array, b: Float32Array): Float32Array {
   for (let column = 0; column < 4; column += 1) {
     for (let row = 0; row < 4; row += 1) {
       out[column * 4 + row] =
-        a[row] * b[column * 4] +
-        a[4 + row] * b[column * 4 + 1] +
-        a[8 + row] * b[column * 4 + 2] +
-        a[12 + row] * b[column * 4 + 3]
+        a[row] * b[column * 4] + a[4 + row] * b[column * 4 + 1] +
+        a[8 + row] * b[column * 4 + 2] + a[12 + row] * b[column * 4 + 3]
     }
   }
   return out
@@ -108,13 +106,37 @@ function modelMatrix(x: number, y: number, z: number, scale: number): Float32Arr
   ])
 }
 
-function geoToXrPosition(east: number, north: number, up: number, heading: number) {
+function geoToXrPosition(east: number, north: number, up: number, heading: number, calibrationYaw = 0) {
   const radians = normalizeHeading(heading) * Math.PI / 180
   const cos = Math.cos(radians)
   const sin = Math.sin(radians)
-  const right = east * cos - north * sin
-  const forward = east * sin + north * cos
-  return { x: right, y: up, z: -forward }
+  const localX = east * cos - north * sin
+  const localZ = -(east * sin + north * cos)
+
+  const calibrationCos = Math.cos(calibrationYaw)
+  const calibrationSin = Math.sin(calibrationYaw)
+  return {
+    x: calibrationCos * localX + calibrationSin * localZ,
+    y: up,
+    z: -calibrationSin * localX + calibrationCos * localZ,
+  }
+}
+
+function getInitialCalibrationYaw(viewMatrix: Float32Array, heading: number): number | null {
+  const forwardX = -viewMatrix[8]
+  const forwardZ = -viewMatrix[10]
+  const horizontalLength = Math.hypot(forwardX, forwardZ)
+  if (horizontalLength < 0.25) return null
+
+  const normalizedX = forwardX / horizontalLength
+  const normalizedZ = forwardZ / horizontalLength
+  const expectedHeadingRadians = normalizeHeading(heading) * Math.PI / 180
+  const expectedX = Math.sin(expectedHeadingRadians)
+  const expectedZ = -Math.cos(expectedHeadingRadians)
+
+  const cross = expectedZ * normalizedX - expectedX * normalizedZ
+  const dot = expectedX * normalizedX + expectedZ * normalizedZ
+  return Math.atan2(cross, dot)
 }
 
 async function requestCompatibleSession(xr: NonNullable<XRNavigator['xr']>): Promise<XRSessionLike | null> {
@@ -189,6 +211,7 @@ export async function startWebXRAnimalSession(
       0, 0.15, 0.2, -0.35, -0.2, 0.2, 0.35, -0.2, 0.2,
     ]), gl.STATIC_DRAW)
 
+    let calibrationYaw: number | null = null
     session.addEventListener('end', () => endHandler?.())
     const render = (_time: number, frame: XRFrameLike) => {
       const pose = frame.getViewerPose(referenceSpace)
@@ -210,10 +233,15 @@ export async function startWebXRAnimalSession(
         gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height)
         const viewMatrix = view.transform.inverse?.matrix ?? invertMatrix(view.transform.matrix)
         if (!viewMatrix) continue
+        if (calibrationYaw == null) {
+          calibrationYaw = getInitialCalibrationYaw(view.transform.matrix, heading)
+        }
+        const yawOffset = calibrationYaw ?? 0
+
         for (const animal of animals) {
           const world = toLocalWorldPosition(location, animal)
           if (world.distance > 1000) continue
-          const xrPosition = geoToXrPosition(world.east, world.north, world.up, heading)
+          const xrPosition = geoToXrPosition(world.east, world.north, world.up, heading, yawOffset)
           const transform = modelMatrix(
             xrPosition.x,
             xrPosition.y + 1.2,
