@@ -176,7 +176,7 @@ export function Animal3D({ rarity = 'common', size = 96 }: Animal3DProps) {
     canvas.height = Math.max(1, Math.round(size * pixelRatio))
     gl.viewport(0, 0, canvas.width, canvas.height)
     gl.enable(gl.DEPTH_TEST)
-    gl.enable(gl.CULL_FACE)
+    gl.disable(gl.CULL_FACE)
     gl.clearColor(0, 0, 0, 0)
     gl.uniform3fv(colorLocation, COLORS[rarity])
 
